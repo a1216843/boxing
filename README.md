@@ -2,6 +2,8 @@
 
 미트 트레이닝처럼 콤보 사인을 랜덤으로 만들어 TTS로 불러주는 Flutter 앱 (Android / iOS / 웹).
 
+웹 버전: https://a1216843.github.io/boxing/ (아이폰은 사파리로 열고 "홈 화면에 추가")
+
 ## 실행
 
 ```powershell
