@@ -439,7 +439,7 @@ List<Guide> motionGuides(Move m) {
     return [Guide(GuideKind.body, _chaikin(points, 3))];
   }
 
-  final leadHand = m.id.startsWith('lead') || m.id.startsWith('jab');
+  final leadHand = m.leadHand!;
   final hand = leadHand ? J.leadHand : J.rearHand;
   final guides = [Guide(GuideKind.glove, track((s) => s[hand]))];
 

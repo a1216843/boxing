@@ -13,8 +13,48 @@ class Combo {
   /// 콤보 전체를 수행하는 데 걸리는 대략적인 시간(초).
   double get duration => moves.fold(0.0, (sum, m) => sum + m.duration);
 
-  String call(Stance stance, CallStyle style) =>
-      joinCalls([for (final m in moves) m.call(stance, style)]);
+  String call(Stance stance, CallStyle style, {bool direction = true}) =>
+      joinCalls(callTokens(stance, style, direction: direction));
+
+  /// 동작별 콜.
+  ///
+  /// [direction]이 false면 레프트/라이트를 뺀다. 앞 동작에서 자연스럽게 이어지는 손
+  /// (펀치 다음은 반대 손, 방어 다음은 체중이 실린 쪽 손)은 말하지 않아도 알기 때문이다.
+  /// 같은 손으로 이어 치면 손을 말하는 대신 끝에 "더블"/"트리플"을 붙인다 ("바디 어퍼 더블").
+  /// 그 밖에 자연스럽지 않은 손은 방향을 남긴다.
+  List<String> callTokens(Stance stance, CallStyle style, {bool direction = true}) {
+    if (direction) return [for (final m in moves) m.call(stance, style)];
+    final tokens = <String>[];
+    var run = 1; // 같은 손으로 이어 친 펀치 수
+    void flush() {
+      if (run >= 2) tokens.last = '${tokens.last} ${run == 2 ? '더블' : '트리플'}';
+      run = 1;
+    }
+
+    for (var i = 0; i < moves.length; i++) {
+      final m = moves[i];
+      final prev = i == 0 ? null : moves[i - 1];
+      final hand = m.leadHand;
+      final natural = _naturalLeadHand(prev);
+      final directional = m.isPunch && m.hasDirection(style);
+      final repeat = directional && hand != natural && prev != null && prev.leadHand == hand;
+      if (repeat) {
+        run++;
+      } else {
+        flush();
+      }
+      final keep = directional && !repeat && hand != natural;
+      tokens.add(m.call(stance, style, direction: keep));
+    }
+    flush();
+    return tokens;
+  }
+
+  static bool _naturalLeadHand(Move? prev) {
+    if (prev == null) return true;
+    if (prev.isPunch) return !prev.leadHand!;
+    return prev.result != Weight.rear;
+  }
 }
 
 const _numberTokens = {'원', '투', '쓰리', '포', '파이브', '식스'};

@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final gen = ComboGenerator(s);
     final calls = <String>{};
     for (var i = 0; i < 40 && calls.length < 6; i++) {
-      calls.add(gen.generate().call(s.stance, s.callStyle));
+      calls.add(gen.generate().call(s.stance, s.callStyle, direction: s.callDirection));
     }
     return calls.toList();
   }
@@ -51,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final combosChanged = prev.level != next.level ||
         prev.stance != next.stance ||
         prev.callStyle != next.callStyle ||
+        prev.callDirection != next.callDirection ||
         prev.includeDefense != next.includeDefense ||
         prev.includeBody != next.includeBody;
     setState(() {
@@ -115,6 +116,13 @@ class _HomeScreenState extends State<HomeScreen> {
               selected: {s.callStyle},
               onSelectionChanged: (v) => _update(s.copyWith(callStyle: v.first)),
             ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('방향 지시 (레프트/라이트)'),
+            subtitle: const Text('끄면 흐름상 정해지는 방향은 생략, 같은 손 연타는 "더블"'),
+            value: s.callDirection,
+            onChanged: (v) => _update(s.copyWith(callDirection: v)),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

@@ -170,14 +170,16 @@ class SessionController extends ChangeNotifier {
       if (remaining <= _minCallWindow) break;
       final plan = _pacer.plan(_generator.next());
       final chunks = plan.chunks;
-      _show(plan.call(settings.stance, settings.callStyle), plan);
+      final calls = plan.chunkCalls(settings.stance, settings.callStyle,
+          direction: settings.callDirection);
+      _show(calls.join(' … '), plan);
       for (var i = 0; i < chunks.length; i++) {
-        final (hold, moves) = chunks[i];
+        final (hold, _) = chunks[i];
         if (i > 0) {
           final at = _pacer.chunkAt(_beatNow, chunks[i - 1].$2, hold);
           if (!await _sleepUntilBeat(at, token)) return false;
         }
-        await _speaker.say(Combo(moves).call(settings.stance, settings.callStyle));
+        await _speaker.say(calls[i]);
         if (!_alive(token)) return false;
       }
       actionId++;

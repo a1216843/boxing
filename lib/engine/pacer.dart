@@ -25,9 +25,20 @@ class CallPlan {
     return out;
   }
 
+  /// 덩어리별로 읽을 콜. 방향 생략은 콤보 전체 흐름을 보고 정한다.
+  List<String> chunkCalls(Stance stance, CallStyle style, {bool direction = true}) {
+    final tokens = combo.callTokens(stance, style, direction: direction);
+    final out = <List<String>>[];
+    for (var i = 0; i < tokens.length; i++) {
+      if (i == 0 || holds[i] > 0) out.add([]);
+      out.last.add(tokens[i]);
+    }
+    return [for (final t in out) joinCalls(t)];
+  }
+
   /// 화면용 콜. 끊는 자리는 "…"로 표시한다 ("원투 … 훅").
-  String call(Stance stance, CallStyle style) =>
-      [for (final (_, moves) in chunks) Combo(moves).call(stance, style)].join(' … ');
+  String call(Stance stance, CallStyle style, {bool direction = true}) =>
+      chunkCalls(stance, style, direction: direction).join(' … ');
 }
 
 /// 콜 타이밍을 정한다.

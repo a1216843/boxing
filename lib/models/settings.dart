@@ -111,6 +111,7 @@ class TrainingSettings {
     this.level = Level.intermediate,
     this.stance = Stance.orthodox,
     this.callStyle = CallStyle.number,
+    this.callDirection = true,
     this.includeDefense = true,
     this.includeBody = true,
     this.earOnly = false,
@@ -125,6 +126,9 @@ class TrainingSettings {
   final Level level;
   final Stance stance;
   final CallStyle callStyle;
+
+  /// 레프트/라이트 방향을 콜에 넣는다. 끄면 흐름상 정해지는 방향은 생략한다.
+  final bool callDirection;
   final bool includeDefense;
   final bool includeBody;
 
@@ -145,6 +149,7 @@ class TrainingSettings {
     Level? level,
     Stance? stance,
     CallStyle? callStyle,
+    bool? callDirection,
     bool? includeDefense,
     bool? includeBody,
     bool? earOnly,
@@ -159,6 +164,7 @@ class TrainingSettings {
       level: level ?? this.level,
       stance: stance ?? this.stance,
       callStyle: callStyle ?? this.callStyle,
+      callDirection: callDirection ?? this.callDirection,
       includeDefense: includeDefense ?? this.includeDefense,
       includeBody: includeBody ?? this.includeBody,
       earOnly: earOnly ?? this.earOnly,
@@ -175,6 +181,7 @@ class TrainingSettings {
         'level': level.name,
         'stance': stance.name,
         'callStyle': callStyle.name,
+        'callDirection': callDirection,
         'includeDefense': includeDefense,
         'includeBody': includeBody,
         'earOnly': earOnly,
@@ -194,6 +201,7 @@ class TrainingSettings {
       level: pick(Level.values, d.level, 'level'),
       stance: pick(Stance.values, d.stance, 'stance'),
       callStyle: pick(CallStyle.values, d.callStyle, 'callStyle'),
+      callDirection: j['callDirection'] as bool? ?? d.callDirection,
       includeDefense: j['includeDefense'] as bool? ?? d.includeDefense,
       includeBody: j['includeBody'] as bool? ?? d.includeBody,
       earOnly: j['earOnly'] as bool? ?? d.earOnly,
