@@ -16,7 +16,6 @@ class ComboFigure extends StatefulWidget {
     required this.callStyle,
     required this.tempo,
     required this.playId,
-    this.holds,
   });
 
   final List<Move> moves;
@@ -26,9 +25,6 @@ class ComboFigure extends StatefulWidget {
 
   /// 바뀔 때마다 처음부터 재생한다 (콜을 다 읽은 순간).
   final int playId;
-
-  /// 끊어 부른 콜이면 동작별로 앞에서 멈추는 시간(초).
-  final List<double>? holds;
 
   @override
   State<ComboFigure> createState() => _ComboFigureState();
@@ -58,7 +54,7 @@ class _ComboFigureState extends State<ComboFigure>
   @override
   void didUpdateWidget(ComboFigure old) {
     super.didUpdateWidget(old);
-    if (old.moves != widget.moves || old.tempo != widget.tempo || old.holds != widget.holds) {
+    if (old.moves != widget.moves || old.tempo != widget.tempo) {
       _load();
       _ctrl.value = 1; // 재생 전까지는 가드 자세
     }
@@ -66,7 +62,7 @@ class _ComboFigureState extends State<ComboFigure>
   }
 
   void _load() {
-    _timeline = PoseTimeline(widget.moves, tempo: widget.tempo, holds: widget.holds);
+    _timeline = PoseTimeline(widget.moves, tempo: widget.tempo);
     final peaks = [for (final m in widget.moves) strikePose(m)];
     _peaks = [for (final p in peaks) p.build()];
     _peakFocus = [for (final p in peaks) p.base];

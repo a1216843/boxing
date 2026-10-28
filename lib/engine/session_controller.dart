@@ -25,10 +25,8 @@ class SessionController extends ChangeNotifier {
   Duration remaining = Duration.zero;
   String? display;
 
-  /// 화면에 띄운 콤보와 끊어 부르는 박자. 카운트다운·휴식 문구일 때는 null.
-  CallPlan? plan;
-
-  Combo? get combo => plan?.combo;
+  /// 화면에 띄운 콤보. 카운트다운·휴식 문구일 때는 null.
+  Combo? combo;
 
   /// 콜을 다 읽은 순간마다 올린다. 자세 애니메이션 재생 신호.
   int actionId = 0;
@@ -104,9 +102,9 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _show(String text, [CallPlan? shown]) {
+  void _show(String text, [Combo? shown]) {
     display = text;
-    plan = shown;
+    combo = shown;
     displayId++;
     notifyListeners();
   }
@@ -168,24 +166,14 @@ class SessionController extends ChangeNotifier {
     while (remaining > _minCallWindow) {
       if (!await _waitWhilePaused(token)) return false;
       if (remaining <= _minCallWindow) break;
-      final plan = _pacer.plan(_generator.next());
-      final chunks = plan.chunks;
-      final calls = plan.chunkCalls(settings.stance, settings.callStyle,
-          direction: settings.callDirection);
-      _show(calls.join(' … '), plan);
-      for (var i = 0; i < chunks.length; i++) {
-        final (hold, _) = chunks[i];
-        if (i > 0) {
-          final at = _pacer.chunkAt(_beatNow, chunks[i - 1].$2, hold);
-          if (!await _sleepUntilBeat(at, token)) return false;
-        }
-        await _speaker.say(calls[i]);
-        if (!_alive(token)) return false;
-      }
+      final combo = _generator.next();
+      _show(combo.call(settings.stance, settings.callStyle), combo);
+      await _speaker.say(combo.speech(settings.stance, settings.callStyle));
+      if (!_alive(token)) return false;
       actionId++;
       notifyListeners();
       final rush = remaining <= _rushWindow;
-      final next = _pacer.nextCallAt(_beatNow, plan, rush: rush);
+      final next = _pacer.nextCallAt(_beatNow, combo, rush: rush);
       if (!await _sleepUntilBeat(next, token)) return false;
     }
     return _sleepUntilPhaseEnds(token);

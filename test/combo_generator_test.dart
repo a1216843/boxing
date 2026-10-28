@@ -90,30 +90,31 @@ void main() {
   test('콜 문구', () {
     expect(Moves.duckLead.call(Stance.orthodox, CallStyle.number), '레프트 더킹');
     expect(Moves.duckLead.call(Stance.southpaw, CallStyle.number), '라이트 더킹');
-    expect(joinCalls(['원', '투', '쓰리']), '원투쓰리');
-    expect(joinCalls(['원', '투', '레프트 훅']), '원투 레프트 훅');
     expect(Moves.leadHook.call(Stance.orthodox, CallStyle.name), '레프트 훅');
     expect(Moves.leadHook.call(Stance.southpaw, CallStyle.name), '라이트 훅');
     expect(Moves.slipLead.call(Stance.orthodox, CallStyle.number), '레프트 슬립');
   });
 
-  test('방향 지시를 끄면 흐름상 정해지는 방향은 빼고, 같은 손 연타는 더블', () {
-    String call(List<Move> moves, [CallStyle style = CallStyle.name]) =>
-        Combo(moves).call(Stance.orthodox, style, direction: false);
+  group('콤보 콜', () {
+    String show(List<Move> moves, [CallStyle style = CallStyle.name]) =>
+        Combo(moves).call(Stance.orthodox, style);
+    String speak(List<Move> moves, [CallStyle style = CallStyle.name]) =>
+        Combo(moves).speech(Stance.orthodox, style);
 
-    expect(call([Moves.jab, Moves.cross, Moves.leadHook]), '원투 훅');
-    expect(call([Moves.leadBody, Moves.leadUpper]), '바디 어퍼 더블');
-    expect(call([Moves.jab, Moves.cross, Moves.leadBody, Moves.leadHook]), '원투 바디 훅 더블');
-    expect(call([Moves.cross, Moves.duckRear, Moves.rearUpper]), '투 더킹 어퍼');
-    expect(call([Moves.slipLead, Moves.leadHook, Moves.cross]), '슬립 훅 투');
-    // 시작부터 뒷손이면 자연스럽지 않으니 방향을 남긴다.
-    expect(call([Moves.rearHook, Moves.leadHook]), '라이트 훅 훅');
-    // 잽 연타는 원래 손이 정해져 있어 더블을 붙이지 않는다.
-    expect(call([Moves.jab, Moves.jab, Moves.cross]), '원원투');
-    // 숫자 콜은 손이 숫자에 들어 있다.
-    expect(call([Moves.leadBody, Moves.leadHook], CallStyle.number), '바디 쓰리 쓰리');
-    // 켜면 그대로.
-    expect(Combo([Moves.leadBody, Moves.leadUpper]).call(Stance.orthodox, CallStyle.name),
-        '레프트 바디 레프트 어퍼');
+    test('숫자끼리는 붙이고 나머지는 동작마다 끊는다', () {
+      expect(show([Moves.jab, Moves.cross, Moves.leadHook], CallStyle.number), '원투쓰리');
+      expect(show([Moves.jab, Moves.cross, Moves.leadHook]), '원투 · 레프트 훅');
+      expect(speak([Moves.jab, Moves.cross, Moves.leadHook]), '원투, 레프트 훅');
+      expect(speak([Moves.rearBody, Moves.rearUpper]), '라이트 바디, 라이트 어퍼');
+      expect(speak([Moves.leadBody, Moves.leadHook], CallStyle.number), '바디 쓰리, 쓰리');
+    });
+
+    test('이름 콜에서 잽은 "잽", 스트레이트가 이어질 때만 "원투"', () {
+      expect(show([Moves.jab, Moves.leadHook]), '잽 · 레프트 훅');
+      expect(show([Moves.jab, Moves.jab, Moves.cross]), '잽 · 원투');
+      expect(speak([Moves.jab, Moves.jabBody, Moves.jab, Moves.jab, Moves.jabBody]),
+          '잽, 바디 잽, 잽, 잽, 바디 잽');
+      expect(speak([Moves.jab, Moves.jabBody], CallStyle.number), '원, 바디 원');
+    });
   });
 }

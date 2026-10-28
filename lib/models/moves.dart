@@ -78,16 +78,8 @@ class Move {
   bool? get leadHand =>
       isDefense ? null : id == 'jab' || id == 'jabBody' || id.startsWith('lead');
 
-  String _template(CallStyle style) =>
-      (style == CallStyle.number ? numberCall : null) ?? nameCall;
-
-  /// 콜에 레프트/라이트가 들어가는지.
-  bool hasDirection(CallStyle style) => _template(style).contains('{');
-
-  /// [direction]이 false면 레프트/라이트를 뺀다 ("레프트 더킹" → "더킹").
-  String call(Stance stance, CallStyle style, {bool direction = true}) {
-    final template = _template(style);
-    if (!direction) return template.replaceAll(RegExp(r'\{[LR]\} ?'), '');
+  String call(Stance stance, CallStyle style) {
+    final template = (style == CallStyle.number ? numberCall : null) ?? nameCall;
     final lead = stance == Stance.orthodox ? '레프트' : '라이트';
     final rear = stance == Stance.orthodox ? '라이트' : '레프트';
     return template.replaceAll('{L}', lead).replaceAll('{R}', rear);
@@ -101,7 +93,8 @@ abstract final class Moves {
   static const jab = Move(
     id: 'jab',
     type: MoveType.jab,
-    nameCall: '원',
+    nameCall: '잽',
+    numberCall: '원',
     duration: 0.35,
     compat: {Weight.lead: 0.6, Weight.center: 1.0, Weight.rear: 0.9},
     result: Weight.center,

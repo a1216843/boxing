@@ -78,7 +78,6 @@ class _SessionScreenState extends State<SessionScreen> {
                         // 화면으로 자세를 확인하는 용도라 실제보다 약간 느리게.
                         tempo: widget.settings.level.profile.tempo * 1.2,
                         playId: s.actionId,
-                        holds: s.plan!.holds,
                       ),
                     ),
                     const SizedBox(height: 16),

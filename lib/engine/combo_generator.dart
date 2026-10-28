@@ -13,64 +13,41 @@ class Combo {
   /// 콤보 전체를 수행하는 데 걸리는 대략적인 시간(초).
   double get duration => moves.fold(0.0, (sum, m) => sum + m.duration);
 
-  String call(Stance stance, CallStyle style, {bool direction = true}) =>
-      joinCalls(callTokens(stance, style, direction: direction));
+  /// 화면용 콜. 동작 단위를 " · "로 구분한다 ("잽 · 바디 잽 · 잽").
+  String call(Stance stance, CallStyle style) => phrases(stance, style).join(' · ');
 
-  /// 동작별 콜.
-  ///
-  /// [direction]이 false면 레프트/라이트를 뺀다. 앞 동작에서 자연스럽게 이어지는 손
-  /// (펀치 다음은 반대 손, 방어 다음은 체중이 실린 쪽 손)은 말하지 않아도 알기 때문이다.
-  /// 같은 손으로 이어 치면 손을 말하는 대신 끝에 "더블"/"트리플"을 붙인다 ("바디 어퍼 더블").
-  /// 그 밖에 자연스럽지 않은 손은 방향을 남긴다.
-  List<String> callTokens(Stance stance, CallStyle style, {bool direction = true}) {
-    if (direction) return [for (final m in moves) m.call(stance, style)];
-    final tokens = <String>[];
-    var run = 1; // 같은 손으로 이어 친 펀치 수
-    void flush() {
-      if (run >= 2) tokens.last = '${tokens.last} ${run == 2 ? '더블' : '트리플'}';
-      run = 1;
-    }
+  /// TTS용 콜. 동작 사이에 쉼표를 넣어 짧게 끊어 읽게 한다.
+  /// "라이트 바디 라이트 어퍼"가 "라이트, 바디 라이트, 어퍼"처럼 섞여 들리지 않도록.
+  String speech(Stance stance, CallStyle style) => phrases(stance, style).join(', ');
 
+  /// 끊어 읽는 단위. 숫자끼리는 한 덩어리("원투쓰리"), 나머지는 동작 하나씩.
+  List<String> phrases(Stance stance, CallStyle style) {
+    final out = <String>[];
+    String? prev;
     for (var i = 0; i < moves.length; i++) {
-      final m = moves[i];
-      final prev = i == 0 ? null : moves[i - 1];
-      final hand = m.leadHand;
-      final natural = _naturalLeadHand(prev);
-      final directional = m.isPunch && m.hasDirection(style);
-      final repeat = directional && hand != natural && prev != null && prev.leadHand == hand;
-      if (repeat) {
-        run++;
+      final token = _token(i, stance, style);
+      if (prev != null && _numberTokens.contains(prev) && _numberTokens.contains(token)) {
+        out.last += token;
       } else {
-        flush();
+        out.add(token);
       }
-      final keep = directional && !repeat && hand != natural;
-      tokens.add(m.call(stance, style, direction: keep));
+      prev = token;
     }
-    flush();
-    return tokens;
+    return out;
   }
 
-  static bool _naturalLeadHand(Move? prev) {
-    if (prev == null) return true;
-    if (prev.isPunch) return !prev.leadHand!;
-    return prev.result != Weight.rear;
+  /// 이름 콜에서 잽은 "잽"이지만, 바로 스트레이트가 이어지면 "원투"로 부른다.
+  String _token(int i, Stance stance, CallStyle style) {
+    final m = moves[i];
+    if (style == CallStyle.name && m.id == Moves.jab.id) {
+      final next = i + 1 < moves.length ? moves[i + 1] : null;
+      return next?.id == Moves.cross.id ? '원' : '잽';
+    }
+    return m.call(stance, style);
   }
 }
 
 const _numberTokens = {'원', '투', '쓰리', '포', '파이브', '식스'};
-
-/// 숫자 콜끼리는 붙여서("원투쓰리"), 나머지는 띄어서 읽는다.
-String joinCalls(List<String> tokens) {
-  final b = StringBuffer();
-  for (var i = 0; i < tokens.length; i++) {
-    if (i > 0 &&
-        !(_numberTokens.contains(tokens[i - 1]) && _numberTokens.contains(tokens[i]))) {
-      b.write(' ');
-    }
-    b.write(tokens[i]);
-  }
-  return b.toString();
-}
 
 /// 체중 이동 규칙을 따라 콤보를 만든다.
 ///

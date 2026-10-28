@@ -31,9 +31,9 @@ flutter build web --release --no-web-resources-cdn   # 로컬 빌드: build/web
 | 파일 | 역할 |
 |---|---|
 | `lib/models/moves.dart` | 동작 정의, 체중 전이 규칙(`compat`/`result`), 정석 연결 가중치(`pairBonus`) |
-| `lib/models/settings.dart` | 난이도별 프로필(콤보 길이, 템포, 박자, 반 박자·끊어 부르기·몰아치기·뜸들이기 확률), 설정 저장 |
+| `lib/models/settings.dart` | 난이도별 프로필(콤보 길이, 템포, 박자, 반 박자·몰아치기·뜸들이기 확률), 설정 저장 |
 | `lib/engine/combo_generator.dart` | 규칙을 따라 콤보 생성, 익숙한 콤보 반복 풀 |
-| `lib/engine/pacer.dart` | 콜 타이밍: 박자 위에 콜을 얹고, 반 박자 당기기·끌기, 콤보 끊어 부르기, 몰아치기·뜸들이기 |
+| `lib/engine/pacer.dart` | 콜 타이밍: 박자 위에 콜을 얹고, 반 박자 당기기·끌기, 몰아치기·뜸들이기 |
 | `lib/engine/session_controller.dart` | 라운드/휴식 타이머와 콜 루프 |
 | `lib/engine/speaker.dart` | TTS 큐 |
 

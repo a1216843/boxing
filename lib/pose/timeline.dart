@@ -4,19 +4,12 @@ import 'skeleton.dart';
 
 /// 콤보 하나를 자세 키프레임으로 펼친다 (동작별 키는 [moveAnim]).
 /// 스텝으로 나간 거리는 다음 동작에 누적된다.
-/// [holds]가 있으면 i번째 동작 앞에서 그만큼 자세를 멈췄다가 이어 친다 (끊어 부른 콜).
 class PoseTimeline {
-  PoseTimeline(this.moves, {double tempo = 1.0, List<double>? holds}) {
+  PoseTimeline(this.moves, {double tempo = 1.0}) {
     var t = 0.0;
     var base = 0.0;
     _keys.add((0, guardPose));
-    for (var i = 0; i < moves.length; i++) {
-      final m = moves[i];
-      final hold = holds == null ? 0.0 : holds[i];
-      if (hold > 0) {
-        t += hold;
-        _keys.add((t, _keys.last.$2));
-      }
+    for (final m in moves) {
       final anim = moveAnim(m);
       final d = animSeconds(m) * tempo;
       _starts.add(t);
