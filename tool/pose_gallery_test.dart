@@ -13,8 +13,8 @@ void main() {
     const perRow = 6;
     final guard = guardPose.build();
     final tiles = [
-      (guardPose, const <Guide>[], false),
-      for (final m in Moves.all) (strikePose(m), motionGuides(m), m.isDefense),
+      (guard, const <Guide>[], false),
+      for (final m in Moves.all) (peakSkeleton(m), motionGuides(m), m.isDefense),
     ];
     final rows = (tiles.length / perRow).ceil() * 2;
     tester.view.devicePixelRatio = 1;
@@ -27,18 +27,19 @@ void main() {
       child: Container(
         color: const Color(0xFF2A1010),
         child: Wrap(textDirection: TextDirection.ltr, children: [
-          for (final mirror in [false, true])
-            for (final (pose, guides, defense) in tiles)
+          for (final mirror in [true, false])
+            for (final (skeleton, guides, defense) in tiles)
             SizedBox.fromSize(
               size: tile,
               child: DecoratedBox(
                 decoration: BoxDecoration(border: Border.all(color: Colors.white24)),
                 child: CustomPaint(painter: FigurePainter(
-                  pose.build(),
+                  skeleton,
                   mirror: mirror,
                   guides: guides,
                   ghost: defense ? guard : null,
-                  focus: pose.base,
+                  focus: focusOf(skeleton),
+                  zoom: 0.85,
                 )),
               ),
             ),

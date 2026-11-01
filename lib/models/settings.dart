@@ -9,10 +9,10 @@ class LevelProfile {
     required this.lengthWeights,
     required this.maxDefenses,
     required this.defenseRate,
-    required this.baseGap,
+    required this.gapMin,
+    required this.gapMax,
     required this.tempo,
     required this.quickChance,
-    required this.longChance,
     required this.beat,
     required this.offbeatChance,
     this.excluded = const <String>{},
@@ -21,23 +21,21 @@ class LevelProfile {
   /// 콤보 길이별 확률 가중치. index 0 = 1동작.
   final List<double> lengthWeights;
 
-  /// 한 콤보 안에 들어갈 수 있는 방어 동작 수.
+  /// 한 콤보 안에 들어갈 수 있는 방어 동작 수. 많으면 펀치보다 피하기가 주가 되므로 1개.
   final int maxDefenses;
 
   /// 방어 동작이 뽑힐 확률 배율.
   final double defenseRate;
 
-  /// 콤보 사이 기본 휴지(초).
-  final double baseGap;
+  /// 콤보 세트 사이 휴지(초)의 범위. 이 안에서 랜덤하게 뽑아 다음 콜이 언제 나올지 모르게 한다.
+  final double gapMin;
+  final double gapMax;
 
   /// 동작 수행 시간 배율 (초급일수록 여유 있게).
   final double tempo;
 
-  /// 쉴 틈 없이 몰아치는 콜이 나올 확률.
+  /// 휴지 없이 바로 다음 콤보를 부를 확률.
   final double quickChance;
-
-  /// 일부러 길게 끌어 긴장을 유지시키는 휴지가 나올 확률.
-  final double longChance;
 
   /// 콜 박자 한 칸(초). 콜은 이 박자에 맞춰 떨어진다.
   final double beat;
@@ -66,33 +64,33 @@ enum Level {
             lengthWeights: [0.2, 0.45, 0.35],
             maxDefenses: 1,
             defenseRate: 0.5,
-            baseGap: 2.6,
+            gapMin: 3,
+            gapMax: 7,
             tempo: 1.4,
-            quickChance: 0.06,
-            longChance: 0.1,
+            quickChance: 0.04,
             beat: 0.8,
             offbeatChance: 0.15,
             excluded: {'rearHook', 'jabBody', 'weaveLead', 'weaveRear', 'pullBack'},
           ),
         Level.intermediate => const LevelProfile(
             lengthWeights: [0.1, 0.3, 0.35, 0.25],
-            maxDefenses: 2,
+            maxDefenses: 1,
             defenseRate: 0.8,
-            baseGap: 1.8,
+            gapMin: 2,
+            gapMax: 6,
             tempo: 1.15,
-            quickChance: 0.14,
-            longChance: 0.12,
+            quickChance: 0.08,
             beat: 0.65,
             offbeatChance: 0.25,
           ),
         Level.advanced => const LevelProfile(
             lengthWeights: [0.06, 0.2, 0.3, 0.26, 0.18],
-            maxDefenses: 2,
+            maxDefenses: 1,
             defenseRate: 1.0,
-            baseGap: 1.2,
+            gapMin: 1.5,
+            gapMax: 5,
             tempo: 1.0,
-            quickChance: 0.22,
-            longChance: 0.12,
+            quickChance: 0.12,
             beat: 0.55,
             offbeatChance: 0.3,
           ),
@@ -113,6 +111,7 @@ class TrainingSettings {
     this.rounds = 3,
     this.speechRate = 0.55,
     this.repeatRatio = 0.4,
+    this.comboRepeats = 2,
   });
 
   final Level level;
@@ -134,6 +133,9 @@ class TrainingSettings {
   /// 이미 나온 콤보를 다시 부를 확률. 높을수록 패턴이 몸에 익는다.
   final double repeatRatio;
 
+  /// 같은 콤보를 연달아 부르는 횟수. 한 번 놓쳐도 다음에 다시 칠 수 있게.
+  final int comboRepeats;
+
   TrainingSettings copyWith({
     Level? level,
     Stance? stance,
@@ -147,6 +149,7 @@ class TrainingSettings {
     int? rounds,
     double? speechRate,
     double? repeatRatio,
+    int? comboRepeats,
   }) {
     return TrainingSettings(
       level: level ?? this.level,
@@ -161,6 +164,7 @@ class TrainingSettings {
       rounds: rounds ?? this.rounds,
       speechRate: speechRate ?? this.speechRate,
       repeatRatio: repeatRatio ?? this.repeatRatio,
+      comboRepeats: comboRepeats ?? this.comboRepeats,
     );
   }
 
@@ -177,6 +181,7 @@ class TrainingSettings {
         'rounds': rounds,
         'speechRate': speechRate,
         'repeatRatio': repeatRatio,
+        'comboRepeats': comboRepeats,
       };
 
   factory TrainingSettings.fromJson(Map<String, dynamic> j) {
@@ -196,6 +201,7 @@ class TrainingSettings {
       rounds: (j['rounds'] as num?)?.toInt() ?? d.rounds,
       speechRate: (j['speechRate'] as num?)?.toDouble() ?? d.speechRate,
       repeatRatio: (j['repeatRatio'] as num?)?.toDouble() ?? d.repeatRatio,
+      comboRepeats: (j['comboRepeats'] as num?)?.toInt() ?? d.comboRepeats,
     );
   }
 }

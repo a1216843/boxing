@@ -1,4 +1,4 @@
-// 인형의 펀치 동작을 30fps 관절 좌표(COCO 17점 순서, 3D)로 내보내는 개발용 도구.
+// 인형의 펀치 동작을 관절 좌표(COCO 17점 순서, 3D)로 내보내는 개발용 도구. 기본 30fps (EXPORT_FPS로 변경).
 // 실제 선수 데이터(BoxingVI)와 같은 지표로 비교할 때 쓴다.
 // EXPORT_PATH=<경로> flutter test tool/export_model_test.dart
 import 'dart:convert';
@@ -38,10 +38,11 @@ void main() {
     final out = <String, Object>{};
     for (final MapEntry(key: name, value: move) in punches.entries) {
       final tl = PoseTimeline([move]);
-      final frames = (animSeconds(move) * 30).round() + 1;
+      final fps = int.parse(Platform.environment['EXPORT_FPS'] ?? '30');
+      final frames = (animSeconds(move) * fps).round() + 1;
       out[name] = {
         'duration': animSeconds(move),
-        'frames': [for (var i = 0; i < frames; i++) coco(tl.at(i / 30))],
+        'frames': [for (var i = 0; i < frames; i++) coco(tl.at(i / fps))],
       };
     }
     final path = Platform.environment['EXPORT_PATH'] ?? 'build/model_punches.json';

@@ -45,8 +45,7 @@ void main() {
       test('길이, 방어 개수, 백스텝 위치', () {
         for (final c in combos) {
           final m = c.moves;
-          expect(m.length, inInclusiveRange(1, profile.maxLength));
-          expect(m.any((x) => x.isPunch), isTrue, reason: c.key);
+          expect(m.length, inInclusiveRange(1, profile.maxLength));          expect(m.any((x) => x.isPunch), isTrue, reason: c.key);
           expect(m.where((x) => x.isDefense).length, lessThanOrEqualTo(profile.maxDefenses));
           for (var i = 0; i < m.length; i++) {
             if (m[i].id == 'backStep') expect(i == 0 || i == m.length - 1, isTrue, reason: c.key);

@@ -167,14 +167,23 @@ class SessionController extends ChangeNotifier {
       if (!await _waitWhilePaused(token)) return false;
       if (remaining <= _minCallWindow) break;
       final combo = _generator.next();
-      _show(combo.call(settings.stance, settings.callStyle), combo);
-      await _speaker.say(combo.speech(settings.stance, settings.callStyle));
-      if (!_alive(token)) return false;
-      actionId++;
-      notifyListeners();
-      final rush = remaining <= _rushWindow;
-      final next = _pacer.nextCallAt(_beatNow, combo, rush: rush);
-      if (!await _sleepUntilBeat(next, token)) return false;
+      // 같은 콤보를 정해진 횟수만큼 연달아 부른다. 첫 번째를 놓쳐도 다음에 다시 칠 수 있게.
+      for (var rep = 1; rep <= settings.comboRepeats; rep++) {
+        if (rep > 1) {
+          if (!await _waitWhilePaused(token)) return false;
+          if (remaining <= _minCallWindow) break;
+        }
+        _show(combo.call(settings.stance, settings.callStyle), combo);
+        await _speaker.say(combo.speech(settings.stance, settings.callStyle));
+        if (!_alive(token)) return false;
+        actionId++;
+        notifyListeners();
+        // 세트를 마치면 랜덤한 시간 동안 콜 없이 움직인다.
+        final next = rep < settings.comboRepeats
+            ? _pacer.repeatAt(_beatNow, combo)
+            : _pacer.nextCallAt(_beatNow, combo, rush: remaining <= _rushWindow);
+        if (!await _sleepUntilBeat(next, token)) return false;
+      }
     }
     return _sleepUntilPhaseEnds(token);
   }

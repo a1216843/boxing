@@ -182,6 +182,16 @@ class _HomeScreenState extends State<HomeScreen> {
             onChanged: (v) => _update(s.copyWith(speechRate: v)),
           ),
           _SliderTile(
+            title: '같은 콤보 연속 횟수',
+            subtitle: '한 번 놓쳐도 다음에 다시 칠 수 있게',
+            valueLabel: '${s.comboRepeats}회',
+            value: s.comboRepeats.toDouble(),
+            min: 1,
+            max: 3,
+            divisions: 2,
+            onChanged: (v) => _update(s.copyWith(comboRepeats: v.round())),
+          ),
+          _SliderTile(
             title: '익숙한 콤보 반복',
             subtitle: '높을수록 같은 패턴이 자주 나와 몸에 익음',
             valueLabel: '${(s.repeatRatio * 100).round()}%',
