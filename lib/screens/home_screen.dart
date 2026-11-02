@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../engine/combo_generator.dart';
 import '../engine/speaker.dart';
@@ -68,6 +70,21 @@ class _HomeScreenState extends State<HomeScreen> {
     await widget.speaker.say(call.replaceAll(' · ', ', '));
   }
 
+  /// 콤보 카드 지도 (web/combo_map/, GitHub Pages에 웹 버전과 함께 배포). 지금 스탠스·난이도로 연다.
+  Future<void> _openComboMap() async {
+    final s = _settings!;
+    final query = 'stance=${s.stance.name}&level=${s.level.name}';
+    // 웹은 앱과 같은 사이트라 같은 탭에서 이동하고(페이지의 "← 미트 콜"로 돌아옴), 폰 앱은 브라우저로 연다.
+    final uri = kIsWeb
+        ? Uri.base.resolve('combo_map/?$query')
+        : Uri.parse('$_webAppUrl/combo_map/?$query');
+    final ok = await launchUrl(uri, webOnlyWindowName: '_self');
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('콤보 카드 지도를 열지 못했어요')));
+    }
+  }
+
   void _start() {
     widget.speaker.unlock();
     widget.speaker.interrupt();
@@ -120,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('방어 동작 포함'),
-            subtitle: const Text('슬립, 더킹, 위빙, 풀백, 백스텝'),
+            subtitle: const Text('슬립, 더킹, 위빙, 스웨이, 백스텝'),
             value: s.includeDefense,
             onChanged: (v) => _update(s.copyWith(includeDefense: v)),
           ),
@@ -225,17 +242,32 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(60)),
-            onPressed: _start,
-            icon: const Icon(Icons.sports_mma),
-            label: const Text('시작', style: TextStyle(fontSize: 20)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                onPressed: _openComboMap,
+                icon: const Icon(Icons.style),
+                label: const Text('콤비네이션 보기'),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(60)),
+                onPressed: _start,
+                icon: const Icon(Icons.sports_mma),
+                label: const Text('시작', style: TextStyle(fontSize: 20)),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+/// 웹 버전 주소 (README 참고).
+const _webAppUrl = 'https://a1216843.github.io/boxing';
 
 String _mmss(int seconds) => '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 

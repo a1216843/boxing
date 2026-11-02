@@ -242,7 +242,7 @@ abstract final class Moves {
   static const pullBack = Move(
     id: 'pullBack',
     type: MoveType.pull,
-    nameCall: '풀백',
+    nameCall: '스웨이',
     duration: 0.5,
     compat: {Weight.lead: 0.8, Weight.center: 1.0, Weight.rear: 0.2},
     result: Weight.rear,

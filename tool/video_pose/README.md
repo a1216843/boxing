@@ -1,13 +1,13 @@
 # 코치 시범 영상으로 방어 동작 맞추기
 
-BoxingVI에는 방어 동작(슬립·더킹·위빙·풀백)이 없다. 그래서 유튜브 코치 시범 영상에서 MediaPipe로 3D 포즈를 뽑아
+BoxingVI에는 방어 동작(슬립·더킹·위빙·스웨이)이 없다. 그래서 유튜브 코치 시범 영상에서 MediaPipe로 3D 포즈를 뽑아
 `lib/pose/poses.dart`의 방어 자세를 맞췄다. 영상과 포즈 데이터는 저장소에 넣지 않고, 수치를 맞추는 기준으로만 쓴다.
 
 ## 쓴 영상
 
 | 영상 | 내용 | 쓴 구간 |
 |---|---|---|
-| [Coach Pillow Fists – Slip, Roll, Pull, Duck](https://www.youtube.com/watch?v=zvI2qR6cTq4) | 한 사람, 전신, 오소독스 | 슬립 95–111초, 더킹·롤 111–153초, 풀백 153–185초 |
+| [Coach Pillow Fists – Slip, Roll, Pull, Duck](https://www.youtube.com/watch?v=zvI2qR6cTq4) | 한 사람, 전신, 오소독스 | 슬립 95–111초, 더킹·롤 111–153초, 스웨이 153–185초 |
 | [FightCamp – How To Slip Punches](https://www.youtube.com/watch?v=-cfSa-gBxtc) | 전신 정면, 오소독스 | 정지 슬립 5개 (슬립 방향·회전 교차 확인) |
 
 ## 다시 돌리기
@@ -41,7 +41,7 @@ python -m venv .venv && .venv/Scripts/pip install yt-dlp mediapipe opencv-python
 | 더킹 낮춤 | 엉덩이 높이가 선 자세의 74~78% (인형 단위 0.15) | 0.32 | 0.15 |
 | 더킹 숙임 | 35° | 28° | 35° |
 | 롤 바닥 | 0.14 낮춤, 34° 숙임, 옆으로 23°, 어깨 35° 회전 | 0.32 낮춤, 25° 숙임 | 0.16 낮춤, 33° 숙임, 끝에서 22°·30° 회전 |
-| 풀백 젖힘 | 14~30° (높이 그대로) | 28° | 20° |
+| 스웨이 젖힘 | 14~30° (높이 그대로) | 28° | 20° |
 
 슬립 회전 방향: 리드 쪽으로 슬립하면 뒷어깨가 앞으로 나와 크로스를 친 것 같은 자세가 된다.
 리어 쪽으로 슬립하면 앞어깨가 앞으로 나온다. 두 코치 모두 같았다.
@@ -107,7 +107,7 @@ python -m venv .venv && .venv/Scripts/pip install yt-dlp mediapipe opencv-python
 몸통이 숙이고, 기울고, 돌 때 머리가 얼마나 따라가는지 재서 회귀 기울기로 냈다(1 = 몸통에 붙어 그대로, 0 = 고정).
 머리 방향은 귀선과 귀 중앙→코로 정했다. 펀치는 [Oliver Betts – Punches 1-6](https://www.youtube.com/watch?v=JhkqSCahsNY) 40~800초를 썼다.
 
-| 몸통 움직임 | 슬립 | 더킹·롤 | 풀백 | 펀치 |
+| 몸통 움직임 | 슬립 | 더킹·롤 | 스웨이 | 펀치 |
 |---|---|---|---|---|
 | 앞 숙임 | 0.43 | 0.12 | 0.37 | 0.12 |
 | 옆 기울기 (몸통 기준) | 0.40 | 0.10 | 0.36 | 0.01 |

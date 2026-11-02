@@ -388,7 +388,7 @@ class Pose {
     V3 dir(V3 v) => lat * v.x + up * v.y + fwd * v.z;
 
     // 머리는 몸통을 그대로 따라가지 않고 시선을 상대에 두도록 되돌린다.
-    // 코치 시범 영상에서 잰 비율: 옆 기울기 0.1~0.4, 앞 숙임 0.12(더킹)~0.4(슬립·풀백), 회전 약 0.75.
+    // 코치 시범 영상에서 잰 비율: 옆 기울기 0.1~0.4, 앞 숙임 0.12(더킹)~0.4(슬립·스웨이), 회전 약 0.75.
     final (headUp, headFwd) = axes(roll * 0.3, pitch * 0.25, yaw * 0.75);
     final head = neck + headUp * _headLocal.y + headFwd * _headLocal.z;
     // 펀치를 뻗으면 견갑골이 앞으로 밀려 어깨가 앞으로 나오고 살짝 올라가 턱을 가린다.
@@ -536,7 +536,7 @@ Pose strikePose(Move m) => switch (m.id) {
       // 올라온 자세는 그쪽 슬립처럼 어깨가 돌아 있다.
       'weaveLead' => Pose(drop: 0.07, pitch: 15, roll: -22, shiftX: -0.06, yaw: 0, hipYaw: 2),
       'weaveRear' => Pose(drop: 0.07, pitch: 10, roll: 22, shiftX: 0.06, yaw: 60, hipYaw: 40),
-      // 풀백: 어깨선은 수평 그대로, 상체를 뒷발 위로 젖힌다. 높이는 그대로.
+      // 스웨이: 어깨선은 수평 그대로, 상체를 뒷발 위로 젖힌다. 높이는 그대로.
       'pullBack' => Pose(yaw: 35, hipYaw: 25, pitch: -20, shiftZ: -0.05, shiftX: 0.02),
       'backStep' => Pose(shiftZ: -0.03).feet(-0.28, -0.28),
       _ => guardPose,

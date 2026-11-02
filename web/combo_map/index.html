@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 콤보 카드 지도. 데이터(data.js)와 카드 그림(cards/)은 tool/combo_map_export_test.dart 로 만든다. -->
+<title>콤보 카드 지도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 레이아웃: 위에 자세 세 칸(체중 위치)을 나란히, 각 칸 안에 다음 카드를 ○ / △ / × 순으로. 아래에 카드를 눌러 콤보를 이어 보는 줄. */
+:root {
+  --bg: #f6f3f1;
+  --fg: #1d1716;
+  --muted: #6e625f;
+  --line: #ddd3cf;
+  --panel: #ffffff;
+  --card: #2a1414;          /* 앱의 카드 바탕: 두 테마 모두 어둡게 */
+  --card-fg: #f3e9e6;
+  --card-muted: #b9a5a0;
+  --accent: #d93a3a;        /* 앱의 강조색 계열 */
+  --accent-soft: #f7dcdc;
+  --amber: #e0a100;
+  --good: #2f8a4f;
+  --ok: #b07a00;
+  --bad: #9a8f8c;
+  --display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151010; --fg: #f1e9e7; --muted: #a8988f; --line: #3a2c2a; --panel: #1e1716;
+    --card: #2d1515; --card-fg: #f3e9e6; --card-muted: #b9a5a0;
+    --accent: #ff5f57; --accent-soft: #3d1c1b; --amber: #ffc107; --good: #5cc785; --ok: #e8b23a; --bad: #7d706d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151010; --fg: #f1e9e7; --muted: #a8988f; --line: #3a2c2a; --panel: #1e1716;
+  --card: #2d1515; --card-fg: #f3e9e6; --card-muted: #b9a5a0;
+  --accent: #ff5f57; --accent-soft: #3d1c1b; --amber: #ffc107; --good: #5cc785; --ok: #e8b23a; --bad: #7d706d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); font-weight: 400; letter-spacing: 0.01em; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.1; }
+h2 { font-size: 24px; }
+p { margin: 0; }
+.back { font-size: 14px; color: var(--muted); text-decoration: none; justify-self: start; }
+.back:hover { color: var(--accent); }
+.lead { color: var(--muted); max-width: 64ch; }
+header { display: grid; gap: 14px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button {
+  font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--muted);
+  padding: 5px 14px; border-radius: 999px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.seg-label { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; margin-right: 6px; }
+button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend b { font-family: var(--mono); font-weight: 500; }
+.t-good { color: var(--good); } .t-ok { color: var(--ok); } .t-bad { color: var(--bad); }
+
+/* 자세 세 칸 */
+.states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .states { grid-template-columns: minmax(0, 1fr); } }
+.state {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 16px; display: grid; gap: 14px; align-content: start; transition: border-color .2s, box-shadow .2s;
+}
+.state.flash { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.state-head { display: flex; gap: 12px; align-items: center; }
+.state-head h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.state-head p { font-size: 13px; color: var(--muted); }
+.feet { flex: none; }
+.tier { display: grid; gap: 8px; }
+.tier-title { font-size: 12px; letter-spacing: 0.06em; color: var(--muted); display: flex; gap: 6px; align-items: baseline; }
+.tier-title .sym { font-size: 15px; font-weight: 700; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.grid.small { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
+.nope { display: flex; flex-wrap: wrap; gap: 6px; }
+.nope span {
+  font-size: 12.5px; color: var(--bad); border: 1px dashed var(--line); border-radius: 6px; padding: 2px 8px;
+  text-decoration: line-through; text-decoration-color: var(--bad);
+}
+.from { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+
+/* 카드 (앱 하단 카드와 같은 그림) */
+.card {
+  position: relative; background: var(--card); color: var(--card-fg); border-radius: 10px; overflow: hidden;
+  border: 2px solid transparent; cursor: pointer; display: grid; grid-template-rows: auto auto; text-align: center;
+  padding: 0 0 6px; font: inherit;
+}
+.card:hover { border-color: var(--accent); }
+.card .pic { aspect-ratio: 360 / 400; overflow: hidden; display: block; max-width: 100%; }
+.card img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.3) translateY(4%); display: block; }
+.card .name { font-size: 13px; font-weight: 700; line-height: 1.25; padding: 0 4px; }
+.card .meta { font-family: var(--mono); font-size: 10.5px; color: var(--card-muted); display: flex; justify-content: center; gap: 6px; }
+.card .val { position: absolute; top: 5px; left: 6px; font-family: var(--mono); font-size: 11px; color: var(--card-muted); }
+.card .def { position: absolute; top: 5px; right: 6px; font-size: 10px; color: var(--amber); letter-spacing: .04em; }
+.card.ok { opacity: .82; }
+.card .to { color: var(--card-fg); }
+.card .bonus { color: var(--amber); }
+.card[disabled] { opacity: .3; cursor: not-allowed; border-color: transparent; }
+
+/* 콤보 따라 만들기 */
+.builder { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 16px; }
+.builder-top { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: end; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+  border-radius: 8px; padding: 7px 14px; cursor: pointer;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.seq-scroll { overflow-x: auto; padding-bottom: 4px; }
+.seq { display: flex; gap: 8px; align-items: center; min-height: 140px; }
+.seq .card { width: 92px; flex: none; cursor: default; }
+.seq .card:hover { border-color: transparent; }
+.arrow { color: var(--muted); font-size: 18px; flex: none; }
+.callout { font-family: var(--display); font-size: 22px; letter-spacing: .02em; }
+.status { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.pill { font-size: 12px; border-radius: 999px; padding: 2px 10px; background: var(--accent-soft); color: var(--fg); }
+.note { font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .state { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <a class="back" href="../">← 미트 콜</a>
+    <h1>콤보 카드 지도</h1>
+    <p class="lead">직전 동작이 끝난 뒤 체중이 어느 발에 실려 있는지에 따라 다음에 나올 수 있는 카드가 정해집니다. 앱의 콤보 생성기와 같은 값입니다. 카드를 누르면 그 동작 뒤의 자세 칸이 표시됩니다.</p>
+    <div class="controls">
+      <div><span class="seg-label">스탠스</span><span class="seg" role="group" aria-label="스탠스">
+        <button id="st-o" aria-pressed="true">오소독스</button><button id="st-s" aria-pressed="false">사우스포</button></span></div>
+      <div><span class="seg-label">레벨</span><span class="seg" role="group" aria-label="레벨">
+        <button id="lv-beginner" aria-pressed="false">초급</button><button id="lv-intermediate" aria-pressed="true">중급</button><button id="lv-advanced" aria-pressed="false">고급</button></span></div>
+    </div>
+    <div class="legend">
+      <span><b class="t-good">○</b> 자연스러움</span>
+      <span><b class="t-ok">△</b> 가능하지만 덜 나옴</span>
+      <span><b class="t-bad">×</b> 나오지 않음</span>    </div>
+  </header>
+
+  <section class="states" id="states" aria-label="자세별 다음 카드"></section>
+
+  <section class="builder" aria-label="콤보 따라 만들기">
+    <div class="builder-top">
+      <div style="display:grid;gap:4px">
+        <h2>콤보 따라 만들기</h2>
+        <p class="note">카드를 눌러 이어 붙이면, 직전 동작과의 정석 연결 보너스와 낮은 자세까지 반영해 다음 후보를 보여 줍니다.</p>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="rand">랜덤 콤보</button>
+        <button class="btn" id="undo">한 칸 지우기</button>
+        <button class="btn" id="reset">처음부터</button>
+      </div>
+    </div>
+    <div class="seq-scroll"><div class="seq" id="seq"></div></div>
+    <div class="callout" id="callout"></div>
+    <div class="status" id="status"></div>
+    <div class="tier"><div class="tier-title">다음에 올 수 있는 카드 (점수 순)</div><div class="grid" id="next"></div></div>
+  </section>
+</div>
+
+<script src="data.js"></script>
+<script>
+const THRESH = 0.12;
+const LOW_MULT = { uppercut: 1.6, body: 1.3, jab: 0.7, straight: 0.8 };
+const DISPLAY = { cross: '스트레이트' };
+let stance = 'o', level = 'intermediate', seq = [];
+const profile = () => DATA.levels[level];
+
+const byId = Object.fromEntries(DATA.moves.map(m => [m.id, m]));
+const sideName = s => (stance === 'o') === (s === 'lead') ? '레프트' : '라이트';
+const STATES = [
+  { key: 'center', title: () => '기본 가드', sub: () => '양발 가운데 · 콤보 시작' },
+  { key: 'lead', title: () => `리드(${sideName('lead')}) 쪽 체중`, sub: () => '앞발에 실림' },
+  { key: 'rear', title: () => `리어(${sideName('rear')}) 쪽 체중`, sub: () => '뒷발에 실림' },
+];
+const stateTitle = k => STATES.find(s => s.key === k).title();
+const name = m => DISPLAY[m.id] || (stance === 'o' ? m.nameO : m.nameS);
+const img = id => `cards/${id}_${stance}.png`;
+const tier = v => v >= 0.8 ? 'good' : v >= THRESH ? 'ok' : 'bad';
+const active = () => DATA.moves.filter(m => !profile().excluded.includes(m.id));
+
+function feet(key) {
+  // 위에서 본 두 발: 앞(리드)·뒤(리어). 체중이 실린 발을 채운다.
+  const f = (x, y, on) => `<rect x="${x}" y="${y}" width="11" height="22" rx="5.5" fill="${on ? 'var(--accent)' : 'none'}" stroke="var(--accent)" stroke-width="1.6"/>`;
+  const lead = key !== 'rear', rear = key !== 'lead';
+  return `<svg class="feet" width="44" height="46" viewBox="0 0 44 46" aria-hidden="true">${f(stance === 'o' ? 8 : 25, 2, lead)}${f(stance === 'o' ? 25 : 8, 21, rear)}</svg>`;
+}
+
+function card(m, opts = {}) {
+  const v = opts.value;
+  const cls = v === undefined ? '' : tier(v);
+  const el = document.createElement(opts.static ? 'div' : 'button');
+  el.className = `card ${cls}`;
+  if (!opts.static) el.type = 'button';
+  if (opts.disabled) el.disabled = true;
+  el.title = `${name(m)} → ${stateTitle(m.result)}${m.low ? ' (낮은 자세)' : ''}`;
+  el.innerHTML = `
+    <span class="pic"><img src="${img(m.id)}" alt="${name(m)} 자세" loading="lazy"></span>
+    ${opts.bonus ? '<span class="val bonus">정석</span>' : ''}
+    ${m.defense ? '<span class="def">방어</span>' : ''}
+    <span class="name">${name(m)}</span>`;
+  return el;
+}
+
+function flash(key) {
+  const el = document.querySelector(`.state[data-key="${key}"]`);
+  if (!el) return;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+  setTimeout(() => el.classList.remove('flash'), 1400);
+}
+
+function renderStates() {
+  const root = document.getElementById('states');
+  root.innerHTML = '';
+  const moves = active();
+  for (const st of STATES) {
+    const sec = document.createElement('article');
+    sec.className = 'state'; sec.dataset.key = st.key;
+    sec.innerHTML = `<div class="state-head">${feet(st.key)}<div><h3>${st.title()}</h3><p>${st.sub()}</p></div></div>`;
+    const ranked = moves.map(m => ({ m, v: m.compat[st.key] })).sort((a, b) => b.v - a.v || b.m.freq - a.m.freq);
+    for (const [t, sym, label] of [['good', '○', '자연스러움'], ['ok', '△', '가능하지만 덜 나옴']]) {
+      const list = ranked.filter(x => tier(x.v) === t);
+      if (!list.length) continue;
+      const box = document.createElement('div'); box.className = 'tier';
+      box.innerHTML = `<div class="tier-title"><span class="sym t-${t}">${sym}</span>${label} · ${list.length}</div>`;
+      const g = document.createElement('div'); g.className = 'grid' + (t === 'ok' ? ' small' : '');
+      for (const { m, v } of list) {
+        const c = card(m, { value: v });
+        c.addEventListener('click', () => flash(m.result));
+        g.append(c);
+      }
+      box.append(g); sec.append(box);
+    }
+    const bad = ranked.filter(x => tier(x.v) === 'bad');
+    if (bad.length) {
+      const box = document.createElement('div'); box.className = 'tier';
+      box.innerHTML = `<div class="tier-title"><span class="sym t-bad">×</span>나오지 않음 · ${bad.length}</div><div class="nope">${bad.map(x => `<span>${name(x.m)}</span>`).join('')}</div>`;
+      sec.append(box);
+    }
+    const into = moves.filter(m => m.result === st.key).map(name);
+    const from = document.createElement('p'); from.className = 'from';
+    from.textContent = (st.key === 'center' ? '콤보 시작, ' : '') + '이 자세로 끝나는 동작: ' + into.join(', ');
+    sec.append(from);
+    root.append(sec);
+  }
+}
+
+// ── 콤보 따라 만들기: 앱의 ComboGenerator와 같은 점수 ──
+function stateAfter(s) {
+  const last = s[s.length - 1];
+  return { weight: last ? last.result : 'center', low: last ? last.low : false };
+}
+function fitOf(m, s) {
+  const { weight } = stateAfter(s);
+  const prev = s[s.length - 1];
+  const bonus = prev ? DATA.bonus[`${prev.id}>${m.id}`] : undefined;
+  return { fit: m.compat[weight] * (bonus || 1), bonus };
+}
+function scoreOf(m, s, length) {
+  const { fit } = fitOf(m, s);
+  if (fit < THRESH) return 0;
+  const { low } = stateAfter(s);
+  const prev = s[s.length - 1], idx = s.length;
+  let v = fit * m.freq;
+  if (m.defense) {
+    if (length === 1) return 0;
+    if (s.filter(x => x.defense).length >= profile().maxDefenses) return 0;
+    if (m.type === 'step' && idx !== 0 && length && idx !== length - 1) return 0;
+    if (prev && prev.defense) v *= 0.15;
+    v *= profile().defenseRate;
+  } else if (prev && prev.defense) v *= 1.4;
+  if (prev && prev.id === m.id) {
+    if (s.length >= 2 && s[s.length - 2].id === m.id) return 0;
+    v *= m.type === 'jab' ? 0.6 : 0.15;
+  }
+  if (idx === 0 && m.type === 'jab') v *= 1.8;
+  if (low) v *= LOW_MULT[m.type] || 1;
+  return v;
+}
+
+function renderBuilder() {
+  const seqEl = document.getElementById('seq');
+  seqEl.innerHTML = '';
+  const start = card({ id: 'guard', nameO: '기본 가드', nameS: '기본 가드', numO: '', numS: '', result: 'center', low: false, defense: false }, { static: true });
+  seqEl.append(start);
+  for (const m of seq) {
+    const a = document.createElement('span'); a.className = 'arrow'; a.textContent = '→';
+    seqEl.append(a, card(m, { static: true }));
+  }
+  document.getElementById('callout').textContent = seq.length ? seq.map(name).join(' · ') : '카드를 골라 콤보를 시작하세요';
+  const { weight, low } = stateAfter(seq);
+  const st = document.getElementById('status');
+  st.innerHTML = `<span>지금 자세</span>${feet(weight)}<span class="pill">${stateTitle(weight)}</span>${low ? '<span class="pill">낮은 자세: 어퍼·바디가 더 자주, 잽·스트레이트는 덜 나옴</span>' : ''}${seq.some(m => m.defense) ? '<span class="pill">방어는 콤보당 1개</span>' : ''}`;
+
+  const next = document.getElementById('next');
+  next.innerHTML = '';
+  const cands = active().map(m => ({ m, ...fitOf(m, seq), score: scoreOf(m, seq, 0) }))
+    .filter(x => x.fit >= THRESH)
+    .sort((a, b) => b.score - a.score);
+  for (const x of cands) {
+    const c = card(x.m, { value: Math.min(x.fit, 9), bonus: x.bonus, disabled: x.score === 0 });
+    c.addEventListener('click', () => { seq.push(x.m); renderBuilder(); });
+    next.append(c);
+  }
+}
+
+function pick(weights) {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) { r -= weights[i]; if (r < 0) return i; }
+  return weights.length - 1;
+}
+function randomCombo() {
+  const lengths = profile().lengthWeights;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const length = pick(lengths) + 1, s = [];
+    let ok = true;
+    for (let i = 0; i < length; i++) {
+      const ms = active(), sc = ms.map(m => scoreOf(m, s, length));
+      if (!sc.some(v => v > 0)) { ok = false; break; }
+      s.push(ms[pick(sc)]);
+    }
+    if (ok && s.some(m => !m.defense)) return s;
+  }
+  return [byId.jab, byId.cross];
+}
+
+function setStance(s) {
+  stance = s;
+  document.getElementById('st-o').setAttribute('aria-pressed', s === 'o');
+  document.getElementById('st-s').setAttribute('aria-pressed', s === 's');
+  renderStates(); renderBuilder();
+}
+function setLevel(l) {
+  level = l;
+  for (const k of Object.keys(DATA.levels)) document.getElementById(`lv-${k}`).setAttribute('aria-pressed', k === l);
+  seq = seq.filter(m => !profile().excluded.includes(m.id));
+  renderStates(); renderBuilder();
+}
+document.getElementById('st-o').onclick = () => setStance('o');
+document.getElementById('st-s').onclick = () => setStance('s');
+for (const k of Object.keys(DATA.levels)) document.getElementById(`lv-${k}`).onclick = () => setLevel(k);
+document.getElementById('undo').onclick = () => { seq.pop(); renderBuilder(); };
+document.getElementById('reset').onclick = () => { seq = []; renderBuilder(); };
+document.getElementById('rand').onclick = () => { seq = randomCombo(); renderBuilder(); };
+
+// 앱에서 열면 지금 설정을 넘겨받는다 (?stance=southpaw&level=beginner).
+const params = new URLSearchParams(location.search);
+seq = [byId.jab, byId.cross];
+stance = params.get('stance') === 'southpaw' ? 's' : 'o';
+document.getElementById('st-o').setAttribute('aria-pressed', stance === 'o');
+document.getElementById('st-s').setAttribute('aria-pressed', stance === 's');
+setLevel(DATA.levels[params.get('level')] ? params.get('level') : 'intermediate');
+</script>
+</body>
+</html>
