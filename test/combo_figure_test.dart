@@ -1,6 +1,7 @@
 import 'package:boxing_coach/models/moves.dart';
 import 'package:boxing_coach/pose/combo_figure.dart';
 import 'package:boxing_coach/pose/figure_painter.dart';
+import 'package:boxing_coach/pose/poses.dart';
 import 'package:boxing_coach/pose/skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,5 +46,42 @@ void main() {
       expect((now - last).abs(), lessThan(0.03), reason: 'switch to $id');
       last = now;
     }
+  });
+
+  testWidgets('더킹 도중 다음 콤보가 오면 낮은 자세가 남지 않고 가드로 돌아온다', (tester) async {
+    Widget figure(List<Move> moves, int playId) => MaterialApp(
+          home: ComboFigure(
+            moves: moves,
+            stance: Stance.orthodox,
+            callStyle: CallStyle.values.first,
+            tempo: 1,
+            playId: playId,
+          ),
+        );
+    double headDrop() {
+      final p = tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .map((c) => c.painter)
+          .whereType<FigurePainter>()
+          .firstWhere((p) => p.zoom == 0.7);
+      return guardPose.build()[J.head].y - p.skeleton[J.head].y;
+    }
+
+    const duck = [Moves.jab, Moves.duckLead];
+    await tester.pumpWidget(figure(duck, 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.pumpWidget(figure(duck, 1));
+    var low = 0.0;
+    for (var i = 0; i < 60 && low < 0.2; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      low = headDrop();
+    }
+    expect(low, greaterThan(0.2), reason: '더킹으로 낮아진 순간');
+    await tester.pumpWidget(figure(const [Moves.cross, Moves.leadHook], 1));
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    // 가드 리듬으로 가볍게 오르내리는 정도만 남는다.
+    expect(headDrop(), lessThan(0.1));
   });
 }

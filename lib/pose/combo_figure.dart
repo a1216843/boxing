@@ -42,7 +42,7 @@ class _ComboFigureState extends State<ComboFigure>
 
   /// 가드 리듬용 시계(초). 콤보 재생과 상관없이 계속 흐른다.
   final ValueNotifier<double> _clock = ValueNotifier(0);
-  late final Ticker _ticker = createTicker((d) => _clock.value = d.inMicroseconds / 1e6)..start();
+  late final Ticker _ticker = createTicker((d) => _clock.value = d.inMicroseconds / 1e6);
   double _playAt = -10, _endAt = -10, _rhythmAtPlay = 1;
 
   /// 카메라가 바라보는 지점. 스텝을 따라 살짝 늦게 미끄러진다.
@@ -67,6 +67,9 @@ class _ComboFigureState extends State<ComboFigure>
   @override
   void initState() {
     super.initState();
+    // late라 처음 쓸 때 만들어진다. 여기서 시작하지 않으면 시계가 0에 멈춰, 이어 붙인 자세 차이([_carried])가
+    // 사라지지 않고 남는다 (위빙·더킹 도중 다음 콤보가 오면 낮은 자세 그대로 이어짐).
+    _ticker.start();
     _load();
   }
 
