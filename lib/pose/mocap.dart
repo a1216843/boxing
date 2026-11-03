@@ -36,10 +36,12 @@ class MotionProfile {
 }
 
 /// 이 펀치를 재생할 움직임 곡선. 데이터에 없는 펀치는 팔 모양이 비슷한 종류의 곡선을 빌린다
-/// (바디 스트레이트 ← 같은 손 스트레이트, 어퍼컷·바디 훅 ← 훅: 팔을 굽혀 치는 펀치). 방어 동작은 null.
+/// (바디 스트레이트 ← 같은 손 스트레이트, 어퍼컷·바디 훅 ← 훅: 팔을 굽혀 치는 펀치). 방어·발놀림은 null.
 MotionProfile? motionProfile(Move m) => switch (m.id) {
       'jab' || 'jabBody' => _profiles['jab'],
       'cross' || 'rearBody' => _profiles['cross'],
       'leadHook' || 'rearHook' || 'leadBody' || 'leadUpper' || 'rearUpper' => _profiles['hook'],
+      // 상급 기술도 팔을 굽혀 치는 펀치라 훅 곡선을 빌린다.
+      'jumpHook' || 'checkHook' || 'overhand' => _profiles['hook'],
       _ => null,
     };

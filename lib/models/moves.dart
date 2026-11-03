@@ -24,7 +24,7 @@ enum CallStyle {
 /// 동작을 마친 뒤 체중이 어느 쪽 발에 실려 있는지.
 enum Weight { lead, center, rear }
 
-enum MoveType { jab, straight, hook, uppercut, body, slip, duck, weave, pull, step }
+enum MoveType { jab, straight, hook, uppercut, overhand, body, slip, duck, weave, pull, step }
 
 const _defenseTypes = {
   MoveType.slip,
@@ -33,6 +33,9 @@ const _defenseTypes = {
   MoveType.pull,
   MoveType.step,
 };
+
+/// 리드 손으로 치는 펀치.
+const _leadPunches = {'jab', 'jabBody', 'leadHook', 'leadUpper', 'leadBody', 'jumpHook', 'checkHook'};
 
 class Move {
   const Move({
@@ -45,6 +48,7 @@ class Move {
     required this.result,
     this.lowAfter = false,
     this.freq = 1.0,
+    this.special = false,
   });
 
   final String id;
@@ -71,12 +75,17 @@ class Move {
   /// 기본 출현 빈도.
   final double freq;
 
+  /// 상급 기술 (점프 훅, 체크 훅, 오버핸드). 상급에서만 나온다.
+  final bool special;
+
   bool get isDefense => _defenseTypes.contains(type);
   bool get isPunch => !isDefense;
 
+  /// 자세 높이를 바꾸는 동작 (바디샷, 더킹, 위빙). 레벨 체인지.
+  bool get changesLevel => lowAfter;
+
   /// 펀치를 치는 손이 리드 손인지. 방어 동작은 null.
-  bool? get leadHand =>
-      isDefense ? null : id == 'jab' || id == 'jabBody' || id.startsWith('lead');
+  bool? get leadHand => isPunch ? _leadPunches.contains(id) : null;
 
   String call(Stance stance, CallStyle style) {
     final template = (style == CallStyle.number ? numberCall : null) ?? nameCall;
@@ -258,12 +267,54 @@ abstract final class Moves {
     freq: 0.4,
   );
 
+
+  // ── 상급 기술 ──
+  // 점프 훅: 두 발로 바닥을 차고 뛰어 들어가며 리드 훅. 착지와 동시에 맞힌다.
+  // 웅크렸다(더킹) 튀어 오르거나 잽으로 거리를 잰 뒤에 나온다.
+  static const jumpHook = Move(
+    id: 'jumpHook',
+    type: MoveType.hook,
+    nameCall: '점프 훅',
+    duration: 0.7,
+    compat: {Weight.lead: 0.4, Weight.center: 1.0, Weight.rear: 0.9},
+    result: Weight.rear,
+    freq: 0.7,
+    special: true,
+  );
+  // 체크 훅: 들어오는 상대에게 리드 훅을 치며 앞발을 축으로 몸을 돌려(뒷발이 뒤로 돌아 나감) 옆으로 빠진다.
+  // 체중이 앞발에 실려 있어야 앞발로 돈다.
+  static const checkHook = Move(
+    id: 'checkHook',
+    type: MoveType.hook,
+    nameCall: '체크 훅',
+    duration: 0.75,
+    compat: {Weight.lead: 1.0, Weight.center: 0.7, Weight.rear: 0.1},
+    result: Weight.center,
+    freq: 0.8,
+    special: true,
+  );
+  // 오버핸드: 리어 손을 위에서 아래로 넘겨 치는 큰 펀치. 리드 쪽으로 머리를 숙이며 체중을 앞으로 싣는다.
+  static const overhand = Move(
+    id: 'overhand',
+    type: MoveType.overhand,
+    nameCall: '오버핸드',
+    duration: 0.6,
+    compat: {Weight.lead: 0.1, Weight.center: 0.8, Weight.rear: 1.0},
+    result: Weight.lead,
+    freq: 0.8,
+    special: true,
+  );
   static const all = [
     jab, cross, leadHook, rearHook, leadUpper, rearUpper,
     leadBody, rearBody, jabBody,
     slipLead, slipRear, duckLead, duckRear, weaveLead, weaveRear, pullBack, backStep,
+    jumpHook, checkHook, overhand,
   ];
+
+  /// 상급 기술 id.
+  static final specialIds = {for (final m in all) if (m.special) m.id};
 }
+
 
 /// 실전에서 자주 쓰는 연결에 주는 가중치 ('이전>다음').
 /// 1보다 크면 더 자주, 체중상 다소 어색해도 정석인 연결(바디→헤드 더블 훅 등)을 살려준다.
@@ -290,4 +341,17 @@ const Map<String, double> pairBonus = {
   'weaveRear>cross': 1.5,
   'pullBack>cross': 3.0,
   'backStep>jab': 2.0,
+  // 상급 기술
+  'jab>jumpHook': 1.4,
+  'duckLead>jumpHook': 2.0,
+  'duckRear>jumpHook': 1.6,
+  'jumpHook>cross': 1.8,
+  'cross>checkHook': 2.0,
+  'rearUpper>checkHook': 1.5,
+  'slipLead>checkHook': 1.5,
+  'jab>overhand': 1.6,
+  'slipRear>overhand': 2.0,
+  'weaveRear>overhand': 1.8,
+  'duckRear>overhand': 1.5,
+  'overhand>leadHook': 2.0,
 };

@@ -5,7 +5,7 @@ import 'mocap.dart';
 import 'skeleton.dart';
 
 /// 팔 상태.
-enum Arm { guard, straight, bodyStraight, hook, uppercut, bodyHook }
+enum Arm { guard, straight, bodyStraight, hook, uppercut, bodyHook, overhand }
 
 /// 주먹 목표와 팔꿈치 방향. 몸통 기준 좌표 (x 옆, y 위, z 몸통 정면) → 몸통이 돌면 같이 돈다.
 class ArmTarget {
@@ -40,6 +40,10 @@ ArmTarget _arm(Arm arm, double side, double yaw) {
     return ArmTarget(hand.rotY(-yaw), V3(side, -0.6, 0), 1);
   }
 
+  // 굽혀 치는 펀치도 상대가 있는 정면을 노린다: 목표와 팔꿈치 방향을 정면 기준으로 잡아 몸통 좌표로 되돌린다.
+  // (몸통 기준으로 잡으면 훅에서 몸통이 75° 돌아 있어 주먹이 상대 쪽이 아니라 옆으로 간다.)
+  ArmTarget aimed(V3 target, V3 pole) => ArmTarget(target.rotY(-yaw), pole.rotY(-yaw), 1);
+
   return switch (arm) {
     // 앞손은 턱 앞, 뒷손은 턱 옆. 팔꿈치는 아래로 내려 갈비뼈를 덮는다.
     // 실제 선수(BoxingVI) 가드 손목은 코보다 몸통 길이의 0.43배 아래. 주먹(글러브 중심)은 그보다 조금 위.
@@ -53,10 +57,13 @@ ArmTarget _arm(Arm arm, double side, double yaw) {
     Arm.bodyStraight => straight(side < 0 ? 0.0 : 0.2),
     // 훅: 팔꿈치를 어깨 높이로 들고, 주먹이 중심선으로 짧은 수평 호를 그린다.
     // 옆으로 크게 빼면 궤적이 실제보다 3배 휜다.
-    Arm.hook => ArmTarget(V3(-side * 0.02, 0.0, 0.38), V3(side, 0.35, -0.2), 1),
+    // 팔꿈치는 바깥으로 들고, 주먹은 정면 중심선의 턱 높이에 닿는다.
+    Arm.hook => aimed(const V3(0.02, 0.04, 0.5), V3(side, 0.25, 0)),
     // 어퍼: 주먹을 가슴 높이로 살짝 떨어뜨렸다가 턱 높이로 올려친다.
-    Arm.uppercut => ArmTarget(V3(side * 0.06, 0.12, 0.3), V3(side * 0.2, -1, 0.2), 1),
-    Arm.bodyHook => ArmTarget(V3(-side * 0.02, -0.3, 0.34), V3(side, -0.3, -0.2), 1),
+    Arm.uppercut => aimed(V3(side * 0.03, 0.14, 0.42), V3(side * 0.3, -1, -0.1)),
+    Arm.bodyHook => aimed(const V3(0.02, -0.12, 0.46), V3(side, -0.2, 0)),
+    // 오버핸드: 팔꿈치를 바깥 위로 들고 주먹이 위에서 비스듬히 내려꽂힌다. 팔은 다 펴지 않는다.
+    Arm.overhand => aimed(const V3(0.14, 0.26, 0.56), V3(side, 0.4, -0.2)),
   };
 }
 
@@ -184,6 +191,8 @@ class Pose {
           double? shiftX,
           double? drop,
           double? pitch,
+          double? leadLift,
+          double? rearLift,
           Order? order}) =>
       Pose._raw(
         lead: lead,
@@ -199,14 +208,54 @@ class Pose {
         rearFootZ: rearFootZ ?? this.rearFootZ,
         leadFootX: leadFootX ?? this.leadFootX,
         rearFootX: rearFootX ?? this.rearFootX,
-        leadLift: leadLift,
-        rearLift: rearLift,
+        leadLift: leadLift ?? this.leadLift,
+        rearLift: rearLift ?? this.rearLift,
         leadPivot: leadPivot,
         rearPivot: rearPivot,
         leadHeel: leadHeel,
         rearHeel: rearHeel,
         order: order ?? this.order,
       );
+
+  /// 두 발을 [lead]·[rear]만큼 든 자세 (점프).
+  Pose lifted(double lead, double rear) => _with(leadLift: lead, rearLift: rear);
+
+  /// 무릎을 [drop]만큼 굽힌 자세.
+  Pose dropped(double drop) => _with(drop: drop);
+
+  /// 앞발 앞꿈치를 축으로 몸 전체를 [deg]도 돌린 자세 (체크 훅·점프 훅). 양수 = 리드 훅이 도는 쪽 (뒷발이 뒤로 돌아 나감).
+  /// 발·골반·몸통 회전이 함께 돌고, 팔은 몸통 좌표라 저절로 따라간다.
+  Pose turned(double deg) {
+    final pivot = V3(-0.14 + leadFootX, 0, 0.38 + leadFootZ);
+    V3 rot(V3 p) => pivot + (p - pivot).rotY(deg);
+    final rearToe = rot(V3(0.24 + rearFootX, 0, -0.1 + rearFootZ));
+    final pelvis = rot(V3(0.02 + (leadFootX + rearFootX) / 2 + shiftX, 0, (leadFootZ + rearFootZ) / 2 + shiftZ));
+    final rfx = rearToe.x - 0.24, rfz = rearToe.z + 0.1;
+    final lean = V3(roll, 0, pitch).rotY(deg);
+    return Pose._raw(
+      lead: lead,
+      rear: rear,
+      yaw: yaw + deg,
+      hipYaw: hipYaw + deg,
+      shiftX: pelvis.x - 0.02 - (leadFootX + rfx) / 2,
+      shiftZ: pelvis.z - (leadFootZ + rfz) / 2,
+      drop: drop,
+      roll: lean.x,
+      pitch: lean.z,
+      leadFootZ: leadFootZ,
+      rearFootZ: rfz,
+      leadFootX: leadFootX,
+      rearFootX: rfx,
+      leadLift: leadLift,
+      rearLift: rearLift,
+      leadPivot: leadPivot + deg,
+      rearPivot: rearPivot - deg,
+      leadHeel: leadHeel,
+      rearHeel: rearHeel,
+      order: order,
+    );
+  }
+
 
   /// 발까지 통째로 앞뒤로([dz]), 옆으로([dx]) 옮긴 자세.
   Pose translated(double dz, [double dx = 0]) => dz == 0 && dx == 0
@@ -219,11 +268,40 @@ class Pose {
 
   /// [from](더킹·위빙 등으로 낮추거나 옆으로 빠진 자세)의 높이와 체중을 이어받은 자세.
   /// 일어서지 않고 그 자리에서 다음 펀치를 친다: 무릎 높이는 대부분, 숙임은 조금, 옆 체중은 절반 남긴다.
+  /// 골반을 올리는 자세(점프, [drop] < 0)는 그대로 둔다.
   Pose leveledFrom(Pose from) => _with(
-        drop: math.max(drop, from.drop * 0.75),
+        drop: drop < 0 ? drop : math.max(drop, from.drop * 0.75),
         pitch: math.max(pitch, from.pitch * 0.4),
         shiftX: shiftX + from.shiftX * 0.5,
       );
+
+  /// 한쪽 팔을 정면 기준(목 원점, 몸통 회전 전) 주먹 위치 [hand]와 팔꿈치 방향 [pole]로 둔 자세.
+  /// 이 자세의 몸통 회전으로 몸통 좌표로 되돌려 넣는다.
+  Pose aimedArm(bool leadArm, V3 hand, V3 pole, double glow) {
+    final a = ArmTarget(hand.rotY(-yaw), pole.rotY(-yaw), glow);
+    return Pose._raw(
+      lead: leadArm ? a : lead,
+      rear: leadArm ? rear : a,
+      yaw: yaw,
+      hipYaw: hipYaw,
+      shiftX: shiftX,
+      shiftZ: shiftZ,
+      drop: drop,
+      roll: roll,
+      pitch: pitch,
+      leadFootZ: leadFootZ,
+      rearFootZ: rearFootZ,
+      leadFootX: leadFootX,
+      rearFootX: rearFootX,
+      leadLift: leadLift,
+      rearLift: rearLift,
+      leadPivot: leadPivot,
+      rearPivot: rearPivot,
+      leadHeel: leadHeel,
+      rearHeel: rearHeel,
+      order: order,
+    );
+  }
 
   /// 이 자세로 옮겨가는 순서를 정한 자세.
   Pose ordered(Order order) => _with(order: order);
@@ -539,6 +617,20 @@ Pose strikePose(Move m) => switch (m.id) {
       // 스웨이: 어깨선은 수평 그대로, 상체를 뒷발 위로 젖힌다. 높이는 그대로.
       'pullBack' => Pose(yaw: 35, hipYaw: 25, pitch: -20, shiftZ: -0.05, shiftX: 0.02),
       'backStep' => Pose(shiftZ: -0.03).feet(-0.28, -0.28),
+      // 점프 훅: 두 발로 뛰어 리드 쪽 앞 대각선(오소독스끼리면 상대 뒷손 쪽)으로 들어가 각을 잡고,
+      // 착지하며 상대 쪽으로 몸을 돌려 리드 훅. 상대는 원래 자리에 있으니 주먹은 원래 정면 쪽으로 간다.
+      'jumpHook' => Pose(
+              lead: Arm.hook, yaw: 75, hipYaw: 50, shiftX: 0.03, drop: 0.02, pitch: 4, leadPivot: 15, leadHeel: 0.3)
+          .feet(_jumpAdvance, _jumpAdvance, leadX: _jumpSide, rearX: _jumpSide)
+          .handShifted(true, const V3(0, 0.08, 0))
+          .turned(_jumpTurn),
+      // 체크 훅: 리드 훅을 맞히는 순간 이미 앞발을 축으로 돌기 시작한다 (끝까지 돌면 [_pivotTurn]).
+      'checkHook' => Pose(
+          lead: Arm.hook, yaw: 75, hipYaw: 50, shiftX: 0.02, leadPivot: 15, leadHeel: 0.3).turned(_pivotTurn * 0.2),
+      // 오버핸드: 리드 쪽으로 머리를 숙여 상대 잽 위로 넘겨 친다. 크로스보다 낮게, 더 기울인다.
+      'overhand' => Pose(
+          rear: Arm.overhand, yaw: -25, hipYaw: -10, shiftX: -0.06, shiftZ: 0.07, drop: 0.06,
+          pitch: 14, roll: -14, rearPivot: 20, rearHeel: 0.6).feet(0.04, 0),
       _ => guardPose,
     };
 
@@ -549,16 +641,42 @@ Skeleton peakSkeleton(Move m) => strikePose(m).build();
 /// (위빙으로 옆으로 각도를 잡는 발놀림이 화면에서 보이도록).
 V3 focusOf(Skeleton s) => V3(0.05, 0, (s[J.leadToe].z + s[J.rearToe].z) / 2);
 
-/// 훅·어퍼가 가는 도중 주먹이 지나가는 쪽 (치는 손 기준 몸통 좌표 오프셋).
+/// 어퍼·오버핸드가 가는 도중 주먹이 지나가는 쪽 (치는 손 기준 몸통 좌표 오프셋).
 /// 치기 전에 뒤로 감는 준비 동작은 실제 선수에게 거의 없다. 손목이 20% 움직이는 시점이 실제 27~58ms인데
-/// 준비 동작을 넣으면 70~97ms로 늦어진다. 대신 가는 도중 훅은 바깥으로, 어퍼는 앞으로 나가며 올라가 휜다.
+/// 준비 동작을 넣으면 70~97ms로 늦어진다. 대신 가는 도중 어퍼는 앞으로 나가며 올라가, 오버핸드는 바깥 위로 돌아 휜다.
+/// 훅은 [_hookVia]로 따로 그린다.
 V3? _arc(Move m) => switch (m.id) {
-      'leadHook' => const V3(-0.09, 0, -0.03),
-      'rearHook' => const V3(0.06, 0, -0.03),
-      'leadBody' => const V3(-0.06, 0, -0.03),
       'leadUpper' || 'rearUpper' => const V3(0, -0.02, 0.1),
+      'overhand' => const V3(0.08, 0.1, -0.04),
       _ => null,
     };
+
+/// 훅 계열 (리드·리어 훅, 리드 바디 훅, 점프 훅, 체크 훅).
+bool _isHook(Move m) => m.type == MoveType.hook || m.id == 'leadBody';
+
+/// 훅이 바깥으로 휘는 폭 (정면 기준). 주먹이 바깥으로 크게 돌아 반원을 그리며 들어간다.
+const _hookBulge = 0.26;
+
+/// 훅 도중 자세. [s] = 0(가드) ~ 1(임팩트).
+///
+/// 팔꿈치를 먼저 어깨 높이로 들어 팔을 90°쯤 굽힌 채 고정하고, 몸통이 돌면서 주먹이 치는 쪽 바깥에서
+/// 안으로 원호를 그리며 정면 목표에 닿는다. 주먹을 먼저 내밀고 팔꿈치만 돌리면 훅이 아니라 휘두른 잽처럼 보인다.
+Pose Function(double s) _hookVia(Move m, Pose peak) {
+  final lead = m.leadHand!;
+  final side = lead ? -1.0 : 1.0;
+  ArmTarget arm(Pose p) => lead ? p.lead : p.rear;
+  // 정면 기준 (몸통 회전을 풀어 놓은) 주먹 위치·팔꿈치 방향.
+  final from = arm(guardPose).hand.rotY(guardPose.yaw), to = arm(peak).hand.rotY(peak.yaw);
+  final poleFrom = arm(guardPose).pole.rotY(guardPose.yaw), poleTo = arm(peak).pole.rotY(peak.yaw);
+  return (s) {
+    final bend = math.sin(math.pi * s);
+    // 앞부분에서 조금 뒤로 빠졌다가 바깥을 돌아 들어오도록, 앞뒤로도 살짝 휜다 (반원).
+    final hand = V3.lerp(from, to, s) + V3(side * _hookBulge * bend, 0.03 * bend, -0.12 * bend * (1 - s));
+    // 팔꿈치는 주먹보다 먼저 올라간다 (가는 길의 앞쪽 40%에서 거의 다 든다).
+    final pole = V3.lerp(poleFrom, poleTo, math.min(1.0, s * 2.2));
+    return Pose.lerp(guardPose, peak, s).aimedArm(lead, hand, pole, s);
+  };
+}
 
 /// 펀치 동작 시간(초)과 임팩트 시점(동작 대비 비율).
 ///
@@ -576,13 +694,17 @@ double animSeconds(Move m) => switch (m.id) {
       'jabBody' => 0.32 * _punchSlow,
       'rearBody' => 0.36 * _punchSlow,
       'leadBody' => 0.38 * _punchSlow,
+      // 상급 기술은 측정 자료가 없어 비슷한 펀치에 발놀림 시간을 더했다.
+      'jumpHook' => 0.45 * _punchSlow,
+      'checkHook' => 0.45 * _punchSlow,
+      'overhand' => 0.36 * _punchSlow,
       // 방어 시간은 코치 튜토리얼에서 쟀는데, 같은 튜토리얼의 펀치(20%→최대 200~300ms)가 실제 펀치
       // (CMU 모션캡처 83~108ms)보다 2배 넘게 느렸다. 튜토리얼 값(슬립 0.30~0.35초 등)을 0.6배로 줄였다.
       'slipLead' || 'slipRear' => 0.27,
       'duckLead' || 'duckRear' => 0.3,
       'pullBack' => 0.36,
       'weaveLead' || 'weaveRear' => 0.5,
-      'backStep' => 0.45,
+      'backStep' => 0.36,
       _ => m.duration,
     };
 
@@ -593,16 +715,28 @@ double _impactAt(Move m) => switch (m.id) {
       'cross' => 0.40,
       'leadHook' || 'rearHook' || 'leadBody' => 0.44,
       'leadUpper' || 'rearUpper' => 0.48,
+      'jumpHook' => 0.52,
+      'checkHook' => 0.36,
+      'overhand' => 0.46,
       _ => 0.45,
     };
 
 /// 위빙에서 옆으로 옮기는 발 거리 (발 길이의 3/4쯤).
 const _weaveStep = 0.12;
 
+/// 체크 훅에서 몸을 돌리는 각도.
+const _pivotTurn = 60.0;
+
+/// 점프 훅으로 뛰어 들어가는 앞·옆 거리(옆은 리드 쪽 = 음수)와 착지하며 상대 쪽으로 도는 각도.
+const _jumpAdvance = 0.45;
+const _jumpSide = -0.22;
+const _jumpTurn = 25.0;
+
+
 /// 동작 하나의 애니메이션: 키프레임 (동작 시간 대비 비율, 자세), 임팩트 시점, 전진 거리.
 /// 발 위치는 동작 시작 지점 기준이고, 콤보에서는 앞 동작들의 [advance]만큼 옮겨 쓴다.
 class MoveAnim {
-  const MoveAnim(this.keys, this.impact, this.advance, {this.side = 0});
+  const MoveAnim(this.keys, this.impact, this.advance, {this.side = 0, this.turn = 0, this.after});
 
   final List<(double, Pose)> keys;
   final double impact;
@@ -610,17 +744,61 @@ class MoveAnim {
 
   /// 옆으로 옮겨 간 거리 (음수 = 리드 쪽).
   final double side;
+
+  /// 앞발을 축으로 몸 전체가 돈 각도 (체크 훅, 점프 훅). 이후 동작은 돈 방향을 정면으로 친다.
+  final double turn;
+
+  /// [turn]이 있을 때 바뀐 좌표에서 본 끝 자세 ([advance]·[side] 적용 전).
+  final Pose? after;
 }
 
 /// 펀치: (휘는 중간 지점 →) 임팩트 → 잠깐 머묾 → 다른 발을 끌어와 스탠스 회복 + 체중이 옮겨간 가드.
 /// 방어: 빠진 자세로 가서 유지 (다음 펀치가 그 자리에서 나간다). 위빙은 바닥을 지나는 U자, 백스텝은 뒷발 먼저.
 MoveAnim moveAnim(Move m) {
   final peak = strikePose(m);
+  if (m.id == 'jumpHook') {
+    // 두 발로 바닥을 차고 뛰어 들어가, 착지하며 맞힌다. (웅크리는 준비 키는 넣지 않는다: 골반이 돌지 않고
+    // 내려가기만 하는 구간은 실제 움직임 곡선([WarpedMove])이 건너뛰어 순간이동처럼 보인다.)
+    final impact = _impactAt(m);
+    final rest = restPose(m.result, m.lowAfter);
+    final via = _hookVia(m, peak);
+    return MoveAnim([
+      // 두 발이 함께 떠서 골반이 올라갔다가, 임팩트와 함께 착지한다.
+      (impact * 0.35, via(0.35).dropped(-0.07).lifted(0.1, 0.1).ordered(Order.bodyFirst)),
+      (impact * 0.7, via(0.7).dropped(-0.1).lifted(0.16, 0.16).ordered(Order.bodyFirst)),
+      (impact, peak.ordered(Order.bodyFirst)),
+      (impact + 0.06, peak),
+      (1.0, rest.translated(_jumpAdvance, _jumpSide).turned(_jumpTurn).ordered(Order.armsFirst)),
+    ], impact, _jumpAdvance, side: _jumpSide, turn: _jumpTurn, after: rest);
+  }
+  if (m.id == 'checkHook') {
+    // 훅을 맞히며 앞발로 돌기 시작해, 거두면서 끝까지 돌아 옆으로 빠진다.
+    final impact = _impactAt(m);
+    final via = _hookVia(m, peak);
+    final rest = restPose(m.result, m.lowAfter);
+    return MoveAnim([
+      (impact * 0.35, via(0.35).ordered(Order.bodyFirst)),
+      (impact * 0.7, via(0.7).ordered(Order.bodyFirst)),
+      (impact, peak.ordered(Order.bodyFirst)),
+      (impact + 0.06, peak),
+      (1.0, rest.turned(_pivotTurn).ordered(Order.armsFirst)),
+    ], impact, 0, turn: _pivotTurn, after: rest);
+  }
   if (m.isPunch) {
     final advance = math.max(peak.leadFootZ, peak.rearFootZ);
     final strike = peak.ordered(Order.bodyFirst);
     final rest = restPose(m.result, m.lowAfter).translated(advance).ordered(Order.armsFirst);
     final impact = _impactAt(m);
+    if (_isHook(m)) {
+      final via = _hookVia(m, peak);
+      return MoveAnim([
+        (impact * 0.35, via(0.35).ordered(Order.bodyFirst)),
+        (impact * 0.7, via(0.7).ordered(Order.bodyFirst)),
+        (impact, strike),
+        (impact + 0.06, strike),
+        (1.0, rest),
+      ], impact, advance);
+    }
     final arc = _arc(m);
     if (arc == null) {
       return MoveAnim([(impact, strike), (impact + 0.12, strike), (1.0, rest)], impact, advance);
@@ -646,11 +824,13 @@ MoveAnim moveAnim(Move m) {
     ], 0.85, dz, side: dx);
   }
   if (m.type == MoveType.step) {
+    // 백스텝: 앞발로 바닥을 차서 두 발이 함께 뒤로 한 번에 미끄러지듯 뛴다 (한 발씩 걷지 않는다).
+    // 차기 직전 체중을 앞발에 살짝 싣고, 뒷발로 받아 착지한다.
     return MoveAnim([
-      (0.5, Pose(shiftZ: -0.08).feet(0, peak.rearFootZ)),
-      (0.9, peak),
+      (0.2, Pose(shiftZ: 0.03, drop: 0.03, leadHeel: 0.3)),
+      (0.75, peak.ordered(Order.together)),
       (1.0, peak),
-    ], 0.9, peak.leadFootZ);
+    ], 0.75, peak.leadFootZ);
   }
   return MoveAnim([(0.8, peak), (1.0, peak)], 0.8, 0);
 }
@@ -662,7 +842,7 @@ MoveAnim moveAnim(Move m) {
 /// 주먹이 뒤따라 빨라지는 순서와 가속·감속은 실제 사람의 것이 되고, 자세는 정석으로 남는다.
 /// 골반 오르내림도 실제 곡선을 더한다.
 class WarpedMove {
-  WarpedMove(List<(double, Pose)> keys, this.impact, this.profile, {required bool leadArm}) {
+  WarpedMove(List<(double, Pose)> keys, this.impact, this.profile, {required this.leadArm}) {
     const n = 48;
     for (final rise in [true, false]) {
       final ts = [for (var i = 0; i <= n; i++) rise ? impact * i / n : impact + (1 - impact) * i / n];
@@ -675,12 +855,34 @@ class WarpedMove {
         return [for (final p in poses) (v(p) - v(ref)).abs() / span];
       }
 
+      // 주먹 진행도는 지나온 길이로 잰다. 직선 거리로 재면 훅처럼 휘어 가는 주먹은 도중에 출발점에서
+      // 목표보다 멀어져 진행도가 1을 넘었다 줄어들고, 시간이 건너뛰어 순간이동처럼 보인다.
       ArmTarget arm(Pose p) => leadArm ? p.lead : p.rear;
-      final hand = [
-        for (final p in poses)
-          (arm(p).hand - arm(ref).hand).length / math.max(1e-9, (arm(peak).hand - arm(ref).hand).length)
-      ];
-      final hip = progress((p) => p.hipYaw, min: 3), torso = progress((p) => p.yaw, min: 3);
+      final steps = [for (var i = 1; i < poses.length; i++) (arm(poses[i]).hand - arm(poses[i - 1]).hand).length];
+      final total = math.max(1e-9, steps.fold(0.0, (a, b) => a + b));
+      var acc = 0.0;
+      final along = [0.0, for (final d in steps) acc += d];
+      // 출발→임팩트는 출발점에서, 임팩트→복귀는 복귀 자세(끝)에서 잰다.
+      final hand = [for (final a in along) rise ? a / total : 1 - a / total];
+      // 다리(골반·발) 진행도: 골반 회전만 보면 점프처럼 발이 뜨고 옮겨 가는 동안 골반이 거의 안 도는 동작은
+      // 이륙이 한순간에 몰린다. 골반 회전·발 위치·발 높이·몸 높이가 움직인 길이를 함께 잰다.
+      List<double> legs() {
+        List<double> v(Pose p) => [p.hipYaw / 60, p.leadFootZ, p.rearFootZ, p.leadFootX, p.rearFootX, p.drop, p.leadLift, p.rearLift];
+        var acc = 0.0;
+        final along = [0.0];
+        for (var i = 1; i < poses.length; i++) {
+          final a = v(poses[i - 1]), b = v(poses[i]);
+          var d = 0.0;
+          for (var k = 0; k < a.length; k++) {
+            d += (b[k] - a[k]) * (b[k] - a[k]);
+          }
+          along.add(acc += math.sqrt(d));
+        }
+        if (acc < 0.05) return const [];
+        return [for (final x in along) rise ? x / acc : 1 - x / acc];
+      }
+
+      final hip = legs(), torso = progress((p) => p.yaw, min: 3);
       final tables = [hand, hip.isEmpty ? hand : hip, torso.isEmpty ? hand : torso];
       (rise ? _rise : _fall).addAll([for (final g in tables) (ts, g, poses)]);
     }
@@ -688,6 +890,7 @@ class WarpedMove {
 
   final double impact;
   final MotionProfile profile;
+  final bool leadArm;
   final List<(List<double>, List<double>, List<Pose>)> _rise = [], _fall = [];
 
   /// 진행도 [q]에 해당하는 키 자세. 출발→임팩트는 처음으로 q에 닿는 시각, 임팩트→복귀는 처음으로 q 아래로 내려가는 시각.
@@ -711,12 +914,16 @@ class WarpedMove {
     final rise = u < impact;
     final v = rise ? u / impact : (u - impact) / (1 - impact);
     final t = rise ? _rise : _fall;
-    return Pose.mix(
-      arms: _find(t[0], profile.handAt(rise, v), rise),
-      legs: _find(t[1], profile.hipAt(rise, v), rise),
-      torso: _find(t[2], profile.shoulderAt(rise, v), rise),
-      bob: profile.bobAt(rise, v),
-    );
+    final arms = _find(t[0], profile.handAt(rise, v), rise);
+    final torso = _find(t[2], profile.shoulderAt(rise, v), rise);
+    final mixed = Pose.mix(arms: arms, legs: _find(t[1], profile.hipAt(rise, v), rise), torso: torso, bob: profile.bobAt(rise, v));
+    // 칠 때 치는 팔은 키 자세에서 정한 정면 기준 길을 그대로 간다: 몸통이 팔보다 먼저 돌아도 주먹이 끌려가지 않게
+    // (끌려가면 훅의 원호가 펴진다). 몸통 좌표로 다시 넣을 때 두 자세의 몸통 회전 차이만큼 되돌린다.
+    // 거둘 때는 팔이 몸통을 따라 가드로 돌아온다.
+    if (!rise) return mixed;
+    final arm = leadArm ? arms.lead : arms.rear;
+    final d = arms.yaw - torso.yaw;
+    return mixed.aimedArm(leadArm, arm.hand.rotY(d + mixed.yaw), arm.pole.rotY(d + mixed.yaw), arm.glow);
   }
 }
 
@@ -786,6 +993,8 @@ class Guide {
 
   Guide translated(double dz) =>
       dz == 0 ? this : Guide(kind, [for (final p in points) p + V3(0, 0, dz)]);
+
+  Guide mapped(V3 Function(V3) f) => Guide(kind, [for (final p in points) f(p)]);
 }
 
 /// 동작의 움직임을 보여주는 화살표들 (가드에서 출발해 임팩트/도착까지).

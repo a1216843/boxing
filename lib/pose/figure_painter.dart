@@ -26,6 +26,9 @@ class FigurePainter extends CustomPainter {
     this.elevation = 16,
     this.zoom = 1.0,
     this.floor = true,
+    this.opponent,
+    this.opponentColor = const Color(0xFF90A4AE),
+    this.opponentAccent = const Color(0xFF448AFF),
   });
 
   final Skeleton skeleton;
@@ -47,6 +50,11 @@ class FigurePainter extends CustomPainter {
   /// 영역 대비 인형 크기. 1보다 작으면 둘레 여백이 늘어난다.
   final double zoom;
   final bool floor;
+
+  /// 마주 선 상대 인형 (콤비네이션 보기). 두 인형의 덩어리를 함께 깊이 정렬해 겹침이 맞게 그린다.
+  final Skeleton? opponent;
+  final Color opponentColor;
+  final Color opponentAccent;
 
   static const _centerY = 0.86;
 
@@ -85,6 +93,8 @@ class FigurePainter extends CustomPainter {
     _sinE = math.sin(el);
 
     if (floor) _drawFloor(canvas);
+    final opp = opponent;
+    if (opp != null) _drawShadows(canvas, opp);
     _drawShadows(canvas, skeleton);
 
     // 골반 링은 바닥에 깔리므로 인형보다 먼저.
@@ -93,8 +103,11 @@ class FigurePainter extends CustomPainter {
     }
 
     final g = ghost;
-    if (g != null) _drawFigure(canvas, g, ghost: true);
-    _drawFigure(canvas, skeleton);
+    if (g != null) _paintItems(_figureItems(canvas, g, color, accent, ghost: true));
+    _paintItems([
+      if (opp != null) ..._figureItems(canvas, opp, opponentColor, opponentAccent),
+      ..._figureItems(canvas, skeleton, color, accent),
+    ]);
 
     for (final g in guides) {
       switch (g.kind) {
@@ -143,7 +156,7 @@ class FigurePainter extends CustomPainter {
 
   /// 마네킹: 끝으로 갈수록 가늘어지는 팔다리, 가슴·허리·골반 볼륨의 몸통, 턱이 있는 머리, 글러브와 신발.
   /// 덩어리마다 화면 깊이로 정렬해 앞에 있는 것을 나중에 그리고, 원통·구처럼 빛 쪽이 밝게 음영을 준다.
-  void _drawFigure(Canvas canvas, Skeleton sk, {bool ghost = false}) {
+  List<(double, VoidCallback)> _figureItems(Canvas canvas, Skeleton sk, Color color, Color accent, {bool ghost = false}) {
     final items = <(double, VoidCallback)>[];
     final base = ghost ? color.withAlpha(40) : color;
     final dark = ghost ? color.withAlpha(25) : Color.lerp(color, Colors.black, 0.6)!;
@@ -324,6 +337,10 @@ class FigurePainter extends CustomPainter {
       capsule(sk[an] - const V3(0, 0.02, 0), sk[toe] + const V3(0, 0.025, 0), 0.042, 0.035, shoe);
     }
 
+    return items;
+  }
+
+  static void _paintItems(List<(double, VoidCallback)> items) {
     items.sort((a, b) => a.$1.compareTo(b.$1));
     for (final (_, draw) in items) {
       draw();
@@ -387,5 +404,6 @@ class FigurePainter extends CustomPainter {
       old.guides != guides ||
       old.focus != focus ||
       old.viewYaw != viewYaw ||
+      old.opponent != opponent ||
       old.color != color;
 }

@@ -119,3 +119,82 @@ class Lengths {
   if (bend.length < 1e-6) bend = const V3(0, -1, 0);
   return (a + dir * along + bend.normalized * h, c);
 }
+
+/// 바닥 평면(x, z)의 강체 변환 (회전·이동). 체크 훅·점프 훅으로 돈 방향을 콤보 뒤 동작에 이어 준다.
+/// 월드 = M · (x, z) + o.
+class Frame {
+  const Frame._(this.a, this.b, this.c, this.d, this.ox, this.oz);
+
+  static const identity = Frame._(1, 0, 0, 1, 0, 0);
+
+  final double a, b, c, d, ox, oz;
+
+  /// [V3.rotY]와 같은 방향으로 [deg]도, [about]을 축으로.
+  factory Frame.rotation(double deg, V3 about) {
+    final r = deg * math.pi / 180;
+    final co = math.cos(r), si = math.sin(r);
+    return Frame._(co, si, -si, co, about.x - (co * about.x + si * about.z), about.z - (-si * about.x + co * about.z));
+  }
+
+  factory Frame.translation(double dx, double dz) => Frame._(1, 0, 0, 1, dx, dz);
+
+  bool get isIdentity => a == 1 && b == 0 && c == 0 && d == 1 && ox == 0 && oz == 0;
+
+  /// 회전 각도(도).
+  double get angle => math.atan2(b, a) * 180 / math.pi;
+
+  V3 apply(V3 p) => V3(a * p.x + b * p.z + ox, p.y, c * p.x + d * p.z + oz);
+
+  V3 applyDir(V3 v) => V3(a * v.x + b * v.z, v.y, c * v.x + d * v.z);
+
+  /// 먼저 [inner], 다음 이 변환.
+  Frame then(Frame inner) => Frame._(
+        a * inner.a + b * inner.c,
+        a * inner.b + b * inner.d,
+        c * inner.a + d * inner.c,
+        c * inner.b + d * inner.d,
+        a * inner.ox + b * inner.oz + ox,
+        c * inner.ox + d * inner.oz + oz,
+      );
+
+  Frame get inverse {
+    final det = a * d - b * c;
+    final ia = d / det, ib = -b / det, ic = -c / det, id = a / det;
+    return Frame._(ia, ib, ic, id, -(ia * ox + ib * oz), -(ic * ox + id * oz));
+  }
+
+  /// 회전 [deg]도(원점 축) 뒤 ([dx], [dz]) 이동.
+  factory Frame.rigid(double deg, double dx, double dz) {
+    final r = deg * math.pi / 180;
+    final co = math.cos(r), si = math.sin(r);
+    return Frame._(co, si, -si, co, dx, dz);
+  }
+
+  /// 두 변환 사이를 각도·이동으로 보간한다 (각도는 가까운 쪽으로).
+  static Frame lerpRigid(Frame a, Frame b, double u) {
+    var d = b.angle - a.angle;
+    while (d > 180) {
+      d -= 360;
+    }
+    while (d < -180) {
+      d += 360;
+    }
+    return Frame.rigid(a.angle + d * u, a.ox + (b.ox - a.ox) * u, a.oz + (b.oz - a.oz) * u);
+  }
+
+  /// 변환을 [u](0~1)만큼 없앤 변환: 회전 각도와 이동을 같은 비율로 줄인다.
+  Frame fadedOut(double u) {
+    final r = angle * (1 - u) * math.pi / 180;
+    final co = math.cos(r), si = math.sin(r);
+    return Frame._(co, si, -si, co, ox * (1 - u), oz * (1 - u));
+  }
+}
+
+extension SkeletonFrame on Skeleton {
+  /// [f]로 옮긴 뼈대.
+  Skeleton transformed(Frame f) {
+    if (f.isIdentity) return this;
+    return Skeleton([for (final p in joints) f.apply(p)],
+        leadGlow: leadGlow, rearGlow: rearGlow, facing: f.applyDir(facing));
+  }
+}

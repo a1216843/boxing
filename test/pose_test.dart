@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:boxing_coach/models/moves.dart';
 import 'package:boxing_coach/pose/mocap.dart';
 import 'package:boxing_coach/pose/poses.dart';
@@ -41,6 +43,45 @@ void main() {
       // 실제 선수(BoxingVI) 훅 궤적 휨(벗어난 폭 / 직선 거리)은 중앙값 0.10~0.16. 모션캡처 클립은 0.09 안팎.
       expect(bulge / chord.length, greaterThan(0.06), reason: m.id);
     }
+  });
+
+  test('훅: 팔꿈치를 들고 팔을 굽힌 채 바깥에서 원호를 그려 들어간다 (주먹을 내밀고 팔꿈치만 돌리지 않는다)', () {
+    for (final m in [Moves.leadHook, Moves.rearHook, Moves.leadBody, Moves.jumpHook, Moves.checkHook]) {
+      final tl = PoseTimeline([m]);
+      final lead = m.leadHand!;
+      final (sh, el, ha) =
+          lead ? (J.leadShoulder, J.leadElbow, J.leadHand) : (J.rearShoulder, J.rearElbow, J.rearHand);
+      final impact = animSeconds(m) * moveAnim(m).impact;
+      final path = [for (var i = 0; i <= 40; i++) tl.at(impact * i / 40)];
+      final a = path.first[ha], b = path.last[ha], chord = b - a;
+      final bulge = path
+          .map((s) => ((s[ha] - a) - chord * ((s[ha] - a).dot(chord) / chord.dot(chord))).length)
+          .reduce((x, y) => x > y ? x : y);
+      expect(bulge, greaterThan(0.1), reason: '${m.id} 원호 폭');
+      // 가는 길 후반: 팔은 굽힌 채(잽은 0.53까지 뻗는다), 팔꿈치는 주먹 높이 언저리.
+      for (final s in path.skip(20)) {
+        expect((s[ha] - s[sh]).length, lessThan(0.42), reason: '${m.id} 팔 굽힘');
+      }
+      if (m.id != 'leadBody') {
+        expect((path.last[el].y - path.last[ha].y).abs(), lessThan(0.08), reason: '${m.id} 팔꿈치 높이');
+      }
+    }
+  });
+
+  test('점프 훅: 두 발이 함께 떠서 골반이 올라갔다가 착지하며 맞힌다', () {
+    final tl = PoseTimeline([Moves.jumpHook]);
+    final impact = animSeconds(Moves.jumpHook) * moveAnim(Moves.jumpHook).impact;
+    final guardY = guardPose.build()[J.pelvis].y;
+    var air = 0.0, rise = 0.0;
+    for (var i = 0; i <= 60; i++) {
+      final s = tl.at(impact * i / 60);
+      air = math.max(air, math.min(s[J.leadToe].y, s[J.rearToe].y));
+      rise = math.max(rise, s[J.pelvis].y - guardY);
+    }
+    expect(air, greaterThan(0.1));
+    expect(rise, greaterThan(0.05));
+    final land = tl.at(impact);
+    expect(math.max(land[J.leadToe].y, land[J.rearToe].y), lessThan(0.03));
   });
 
   test('칠 때는 몸이 먼저, 거둘 때는 팔이 먼저 움직인다', () {
@@ -180,6 +221,61 @@ void main() {
       // 키마다 멈추면 바닥에서 속도가 0이 되어 ㄷ자로 꺾인다. U자 바닥에선 위아래 속도만 0이고 옆으로는 계속 간다.
       expect(speed(anim.keys.first.$1), greaterThan(top * 0.3), reason: m.id);
     }
+  });
+
+  test('체크 훅·점프 훅·백스텝이 든 콤보도 끊기지 않고, 끝나면 걸음 없이 출발점에 돌아온다', () {
+    final guard = guardPose.build();
+    for (final moves in [
+      [Moves.cross, Moves.checkHook, Moves.cross],
+      [Moves.duckLead, Moves.jumpHook, Moves.overhand],
+      [Moves.jab, Moves.jumpHook, Moves.cross, Moves.leadHook, Moves.backStep],
+      [Moves.backStep, Moves.jab, Moves.cross],
+    ]) {
+      final tl = PoseTimeline(moves);
+      final end = tl.at(tl.duration);
+      for (final j in J.values) {
+        expect((end[j] - guard[j]).length, lessThan(1e-6), reason: '$moves $j');
+      }
+      // 몸통·다리는 한 프레임(1/240초)에 2.5cm 넘게 움직이지 않는다 (팔은 훅 팔꿈치가 넘어가는 순간이 있어 뺀다).
+      const dt = 1 / 240;
+      const body = [J.head, J.neck, J.pelvis, J.leadHip, J.rearHip, J.leadKnee, J.rearKnee, J.leadToe, J.rearToe];
+      var prev = tl.at(0);
+      for (var t = dt; t <= tl.duration; t += dt) {
+        final s = tl.at(t);
+        for (final j in body) {
+          expect((s[j] - prev[j]).length, lessThan(0.025), reason: '$moves $j @$t');
+        }
+        prev = s;
+      }
+      for (var i = 0; i <= 100; i++) {
+        final s = tl.at(tl.actionEnd + 0.4 + (tl.duration - tl.actionEnd - 0.4) * i / 100);
+        expect(s[J.leadToe].y < 0.005 && s[J.rearToe].y < 0.005, isTrue, reason: '$moves $i');
+      }
+    }
+  });
+
+  test('백스텝: 두 발이 함께 떠서 한 번에 뒤로 뛴다 (한 발씩 걷지 않는다)', () {
+    final anim = moveAnim(Moves.backStep);
+    final keys = [(0.0, guardPose), ...anim.keys];
+    final g = guardPose.build();
+    var air = 0.0;
+    for (var i = 0; i <= 100; i++) {
+      final s = samplePoses(keys, i / 100).build();
+      air = math.max(air, math.min(s[J.leadToe].y, s[J.rearToe].y));
+      // 두 발이 같이 움직인다: 어느 순간에도 두 발의 뒤로 간 거리 차이가 작다.
+      final lead = g[J.leadToe].z - s[J.leadToe].z, rear = g[J.rearToe].z - s[J.rearToe].z;
+      expect((lead - rear).abs(), lessThan(0.05), reason: '$i');
+    }
+    expect(air, greaterThan(0.03));
+  });
+
+  test('점프 훅은 두 발이 함께 떠서 앞으로 들어간다', () {
+    final anim = moveAnim(Moves.jumpHook);
+    final keys = [(0.0, guardPose), ...anim.keys];
+    final air = samplePoses(keys, anim.impact * 0.5).build();
+    expect(air[J.leadToe].y, greaterThan(0.03));
+    expect(air[J.rearToe].y, greaterThan(0.03));
+    expect(anim.advance, greaterThan(0.2));
   });
 
   test('타임라인 단계', () {

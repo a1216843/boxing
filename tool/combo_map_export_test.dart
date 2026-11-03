@@ -27,7 +27,7 @@ void main() {
     final guard = guardPose.build();
     final tiles = [
       ('guard', guard, const <Guide>[], false),
-      for (final m in Moves.all) (m.id, peakSkeleton(m), motionGuides(m), m.isDefense),
+      for (final m in Moves.all) (m.id, peakSkeleton(m), motionGuides(m), !m.isPunch),
     ];
     for (final (id, skeleton, guides, defense) in tiles) {
       // 앱 하단 카드와 같은 그림: 오소독스는 좌우를 뒤집어 그린다.

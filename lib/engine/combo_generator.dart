@@ -36,6 +36,10 @@ class Combo {
     return out;
   }
 
+  /// 동작마다 하나씩 (숫자를 붙이지 않는다). 단계 카드용.
+  List<String> phrasesPerMove(Stance stance, CallStyle style) =>
+      [for (var i = 0; i < moves.length; i++) _token(i, stance, style)];
+
   /// 이름 콜에서 잽은 "잽"이지만, 바로 스트레이트가 이어지면 "원투"로 부른다.
   String _token(int i, Stance stance, CallStyle style) {
     final m = moves[i];
@@ -138,29 +142,47 @@ class ComboGenerator {
   double _score(Move m, List<Move> seq, Weight weight, bool low, int length) {
     final index = seq.length;
     final prev = seq.isEmpty ? null : seq.last;
+    final p = _profile;
 
-    var fit = m.compat[weight] ?? 0;
-    if (prev != null) fit *= pairBonus['${prev.id}>${m.id}'] ?? 1.0;
-    if (fit < awkwardThreshold) return 0;
+    final compat = m.compat[weight] ?? 0;
+    final bonus = prev == null ? 1.0 : pairBonus['${prev.id}>${m.id}'] ?? 1.0;
+    if (compat * bonus < awkwardThreshold) return 0;
 
-    var s = fit * m.freq;
+    // 정석 연결을 얼마나 밀어줄지는 레벨마다 다르다 (초급은 기본 콤보 위주, 중급 이상은 고르게).
+    var s = compat * pow(bonus, p.pairEmphasis) * m.freq;
+
+    if (m.special) {
+      if (seq.where((x) => x.special).length >= p.maxSpecials || seq.contains(m)) return 0;
+      s *= p.specialRate;
+    }
 
     if (m.isDefense) {
       if (length == 1) return 0;
-      if (seq.where((x) => x.isDefense).length >= _profile.maxDefenses) return 0;
+      if (seq.where((x) => x.isDefense).length >= p.maxDefenses) return 0;
       if (m.type == MoveType.step && index != 0 && index != length - 1) return 0;
       if (prev != null && prev.isDefense) {
         if (seq.length >= 2 && seq[seq.length - 2].isDefense) return 0;
         s *= 0.15;
       }
-      s *= _profile.defenseRate;
+      s *= p.defenseRate;
     } else if (prev != null && prev.isDefense) {
       s *= 1.4; // 피하고 바로 카운터
+    }
+
+    // 레벨 체인지: 몇 번까지, 얼마나 자주, 위아래를 얼마나 오갈지.
+    if (m.changesLevel) {
+      if (seq.where((x) => x.changesLevel).length >= p.maxLow) return 0;
+      s *= p.lowRate;
+    }
+    if (prev != null && prev.changesLevel != m.changesLevel) {
+      s *= p.levelSwitch;
     }
 
     if (prev != null && prev.id == m.id) {
       if (seq.length >= 2 && seq[seq.length - 2].id == m.id) return 0;
       s *= m.type == MoveType.jab ? 0.6 : 0.15;
+    } else if (m.isPunch && m.type != MoveType.jab && seq.any((x) => x.type == m.type)) {
+      s *= p.variety; // 같은 종류 펀치가 이미 있으면 다른 종류를 섞는다
     }
 
     if (index == 0 && m.type == MoveType.jab) s *= 1.8;

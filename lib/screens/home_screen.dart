@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../engine/combo_generator.dart';
 import '../engine/speaker.dart';
-import '../models/moves.dart';
 import '../models/settings.dart';
-import 'session_screen.dart';
+import 'combination_screen.dart';
+import 'meet_call_screen.dart';
 
+/// 홈: 미트 콜, 콤보 카드 맵, 콤비네이션 보기.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.speaker});
 
@@ -18,246 +18,94 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  TrainingSettings? _settings;
-  List<String> _samples = const [];
+  /// 콤보 카드 맵과 콤비네이션 보기는 미트 콜에서 고른 난이도·스탠스·콜 방식으로 연다.
+  Future<TrainingSettings> _settings() => SettingsStore.load();
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  Future<void> _openMeetCall() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => MeetCallScreen(speaker: widget.speaker)));
 
-  Future<void> _load() async {
-    final s = await SettingsStore.load();
-    try {
-      await widget.speaker.init();
-    } catch (_) {}
+  Future<void> _openCombinations() async {
+    final s = await _settings();
     if (!mounted) return;
-    setState(() {
-      _settings = s;
-      _samples = _makeSamples(s);
-    });
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CombinationListScreen(settings: s)));
   }
 
-  List<String> _makeSamples(TrainingSettings s) {
-    final gen = ComboGenerator(s);
-    final calls = <String>{};
-    for (var i = 0; i < 40 && calls.length < 6; i++) {
-      calls.add(gen.generate().call(s.stance, s.callStyle));
-    }
-    return calls.toList();
-  }
-
-  void _update(TrainingSettings next) {
-    final prev = _settings!;
-    final combosChanged = prev.level != next.level ||
-        prev.stance != next.stance ||
-        prev.callStyle != next.callStyle ||
-        prev.includeDefense != next.includeDefense ||
-        prev.includeBody != next.includeBody;
-    setState(() {
-      _settings = next;
-      if (combosChanged) _samples = _makeSamples(next);
-    });
-    SettingsStore.save(next);
-  }
-
-  Future<void> _preview(String call) async {
-    widget.speaker.unlock();
-    await widget.speaker.interrupt();
-    await widget.speaker.setRate(_settings!.speechRate);
-    // 화면용 구분점(" · ")을 쉼표로 바꿔 실제 세션처럼 끊어 읽는다.
-    await widget.speaker.say(call.replaceAll(' · ', ', '));
-  }
-
-  /// 콤보 카드 지도 (web/combo_map/, GitHub Pages에 웹 버전과 함께 배포). 지금 스탠스·난이도로 연다.
+  /// 콤보 카드 맵 (web/combo_map/, GitHub Pages에 웹 버전과 함께 배포).
   Future<void> _openComboMap() async {
-    final s = _settings!;
+    final s = await _settings();
     final query = 'stance=${s.stance.name}&level=${s.level.name}';
-    // 웹은 앱과 같은 사이트라 같은 탭에서 이동하고(페이지의 "← 미트 콜"로 돌아옴), 폰 앱은 브라우저로 연다.
-    final uri = kIsWeb
-        ? Uri.base.resolve('combo_map/?$query')
-        : Uri.parse('$_webAppUrl/combo_map/?$query');
+    // 웹은 앱과 같은 사이트라 같은 탭에서 이동하고(페이지의 "← 홈"으로 돌아옴), 폰 앱은 브라우저로 연다.
+    final uri = kIsWeb ? Uri.base.resolve('combo_map/?$query') : Uri.parse('$_webAppUrl/combo_map/?$query');
     final ok = await launchUrl(uri, webOnlyWindowName: '_self');
     if (!ok && mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('콤보 카드 지도를 열지 못했어요')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('콤보 카드 맵을 열지 못했어요')));
     }
-  }
-
-  void _start() {
-    widget.speaker.unlock();
-    widget.speaker.interrupt();
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => SessionScreen(settings: _settings!, speaker: widget.speaker),
-    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final s = _settings;
-    if (s == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
     return Scaffold(
-      appBar: AppBar(title: const Text('미트 콜')),
+      appBar: AppBar(title: const Text('복싱 코치')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          _Section(
-            title: '난이도',
-            child: SegmentedButton<Level>(
-              segments: [
-                for (final l in Level.values) ButtonSegment(value: l, label: Text(l.label)),
-              ],
-              selected: {s.level},
-              onSelectionChanged: (v) => _update(s.copyWith(level: v.first)),
-            ),
+          _MenuCard(
+            icon: Icons.sports_mma,
+            title: '미트 콜',
+            body: '라운드 동안 콤보를 불러 줍니다. 난이도와 스탠스, 콜 방식을 고르고 시작하세요.',
+            onTap: _openMeetCall,
           ),
-          _Section(
-            title: '스탠스',
-            child: SegmentedButton<Stance>(
-              segments: [
-                for (final v in Stance.values) ButtonSegment(value: v, label: Text(v.label)),
-              ],
-              selected: {s.stance},
-              onSelectionChanged: (v) => _update(s.copyWith(stance: v.first)),
-            ),
+          _MenuCard(
+            icon: Icons.style,
+            title: '콤보 카드 맵',
+            body: '자세(체중)마다 다음에 이어질 수 있는 동작을 카드로 봅니다. 카드를 골라 콤보를 직접 만들어 볼 수 있어요.',
+            onTap: _openComboMap,
           ),
-          _Section(
-            title: '콜 방식',
-            child: SegmentedButton<CallStyle>(
-              segments: [
-                for (final v in CallStyle.values) ButtonSegment(value: v, label: Text(v.label)),
-              ],
-              selected: {s.callStyle},
-              onSelectionChanged: (v) => _update(s.copyWith(callStyle: v.first)),
-            ),
+          _MenuCard(
+            icon: Icons.people_alt_outlined,
+            title: '콤비네이션 보기',
+            body: '난이도별 콤비네이션을 골라, 상대가 있을 때 어떻게 쓰이는지 두 인형의 시연으로 봅니다.',
+            onTap: _openCombinations,
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('방어 동작 포함'),
-            subtitle: const Text('슬립, 더킹, 위빙, 스웨이, 백스텝'),
-            value: s.includeDefense,
-            onChanged: (v) => _update(s.copyWith(includeDefense: v)),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('바디 공격 포함'),
-            value: s.includeBody,
-            onChanged: (v) => _update(s.copyWith(includeBody: v)),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('자세 그림 표시'),
-            subtitle: const Text('콤보 동작을 단계별 픽토그램으로'),
-            value: s.showFigure,
-            onChanged: s.earOnly ? null : (v) => _update(s.copyWith(showFigure: v)),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('소리만 모드'),
-            subtitle: const Text('화면에 콤보를 띄우지 않음'),
-            value: s.earOnly,
-            onChanged: (v) => _update(s.copyWith(earOnly: v)),
-          ),
-          const Divider(height: 32),
-          _SliderTile(
-            title: '라운드 시간',
-            valueLabel: _mmss(s.roundSeconds),
-            value: s.roundSeconds.toDouble(),
-            min: 30,
-            max: 300,
-            divisions: 9,
-            onChanged: (v) => _update(s.copyWith(roundSeconds: v.round())),
-          ),
-          _SliderTile(
-            title: '휴식 시간',
-            valueLabel: _mmss(s.restSeconds),
-            value: s.restSeconds.toDouble(),
-            min: 15,
-            max: 120,
-            divisions: 7,
-            onChanged: (v) => _update(s.copyWith(restSeconds: v.round())),
-          ),
-          _SliderTile(
-            title: '라운드 수',
-            valueLabel: '${s.rounds}R',
-            value: s.rounds.toDouble(),
-            min: 1,
-            max: 12,
-            divisions: 11,
-            onChanged: (v) => _update(s.copyWith(rounds: v.round())),
-          ),
-          _SliderTile(
-            title: '말 속도',
-            valueLabel: s.speechRate.toStringAsFixed(2),
-            value: s.speechRate,
-            min: 0.35,
-            max: 0.8,
-            divisions: 9,
-            onChanged: (v) => _update(s.copyWith(speechRate: v)),
-          ),
-          _SliderTile(
-            title: '같은 콤보 연속 횟수',
-            subtitle: '한 번 놓쳐도 다음에 다시 칠 수 있게',
-            valueLabel: '${s.comboRepeats}회',
-            value: s.comboRepeats.toDouble(),
-            min: 1,
-            max: 3,
-            divisions: 2,
-            onChanged: (v) => _update(s.copyWith(comboRepeats: v.round())),
-          ),
-          _SliderTile(
-            title: '익숙한 콤보 반복',
-            subtitle: '높을수록 같은 패턴이 자주 나와 몸에 익음',
-            valueLabel: '${(s.repeatRatio * 100).round()}%',
-            value: s.repeatRatio,
-            min: 0,
-            max: 0.8,
-            divisions: 8,
-            onChanged: (v) => _update(s.copyWith(repeatRatio: v)),
-          ),
-          const Divider(height: 32),
-          Row(
-            children: [
-              Text('콤보 미리보기', style: Theme.of(context).textTheme.titleMedium),
-              const Spacer(),
-              IconButton(
-                tooltip: '다시 만들기',
-                icon: const Icon(Icons.refresh),
-                onPressed: () => setState(() => _samples = _makeSamples(s)),
-              ),
-            ],
-          ),
-          for (final call in _samples)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(call, style: const TextStyle(fontSize: 18)),
-              trailing: const Icon(Icons.volume_up),
-              onTap: () => _preview(call),
-            ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
+    );
+  }
+}
+
+class _MenuCard extends StatelessWidget {
+  const _MenuCard({required this.icon, required this.title, required this.body, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.all(20),
+          child: Row(
             children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                onPressed: _openComboMap,
-                icon: const Icon(Icons.style),
-                label: const Text('콤비네이션 보기'),
+              Icon(icon, size: 40, color: scheme.primary),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    Text(body, style: Theme.of(context).textTheme.bodyMedium),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(60)),
-                onPressed: _start,
-                icon: const Icon(Icons.sports_mma),
-                label: const Text('시작', style: TextStyle(fontSize: 20)),
-              ),
+              const Icon(Icons.chevron_right),
             ],
           ),
         ),
@@ -268,74 +116,3 @@ class _HomeScreenState extends State<HomeScreen> {
 
 /// 웹 버전 주소 (README 참고).
 const _webAppUrl = 'https://a1216843.github.io/boxing';
-
-String _mmss(int seconds) => '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
-
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _SliderTile extends StatelessWidget {
-  const _SliderTile({
-    required this.title,
-    this.subtitle,
-    required this.valueLabel,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.divisions,
-    required this.onChanged,
-  });
-
-  final String title;
-  final String? subtitle;
-  final String valueLabel;
-  final double value;
-  final double min;
-  final double max;
-  final int divisions;
-  final ValueChanged<double> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(title, style: theme.textTheme.titleSmall),
-            const Spacer(),
-            Text(valueLabel, style: theme.textTheme.titleSmall),
-          ],
-        ),
-        if (subtitle != null) Text(subtitle!, style: theme.textTheme.bodySmall),
-        Slider(
-          value: value.clamp(min, max),
-          min: min,
-          max: max,
-          divisions: divisions,
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
-}

@@ -5,6 +5,7 @@ const DATA = {
    "id": "jab",
    "type": "jab",
    "defense": false,
+   "special": false,
    "nameO": "잽",
    "nameS": "잽",
    "compat": {
@@ -20,6 +21,7 @@ const DATA = {
    "id": "cross",
    "type": "straight",
    "defense": false,
+   "special": false,
    "nameO": "투",
    "nameS": "투",
    "compat": {
@@ -35,6 +37,7 @@ const DATA = {
    "id": "leadHook",
    "type": "hook",
    "defense": false,
+   "special": false,
    "nameO": "레프트 훅",
    "nameS": "라이트 훅",
    "compat": {
@@ -50,6 +53,7 @@ const DATA = {
    "id": "rearHook",
    "type": "hook",
    "defense": false,
+   "special": false,
    "nameO": "라이트 훅",
    "nameS": "레프트 훅",
    "compat": {
@@ -65,6 +69,7 @@ const DATA = {
    "id": "leadUpper",
    "type": "uppercut",
    "defense": false,
+   "special": false,
    "nameO": "레프트 어퍼",
    "nameS": "라이트 어퍼",
    "compat": {
@@ -80,6 +85,7 @@ const DATA = {
    "id": "rearUpper",
    "type": "uppercut",
    "defense": false,
+   "special": false,
    "nameO": "라이트 어퍼",
    "nameS": "레프트 어퍼",
    "compat": {
@@ -95,6 +101,7 @@ const DATA = {
    "id": "leadBody",
    "type": "body",
    "defense": false,
+   "special": false,
    "nameO": "레프트 바디",
    "nameS": "라이트 바디",
    "compat": {
@@ -110,6 +117,7 @@ const DATA = {
    "id": "rearBody",
    "type": "body",
    "defense": false,
+   "special": false,
    "nameO": "라이트 바디",
    "nameS": "레프트 바디",
    "compat": {
@@ -125,6 +133,7 @@ const DATA = {
    "id": "jabBody",
    "type": "body",
    "defense": false,
+   "special": false,
    "nameO": "바디 잽",
    "nameS": "바디 잽",
    "compat": {
@@ -140,6 +149,7 @@ const DATA = {
    "id": "slipLead",
    "type": "slip",
    "defense": true,
+   "special": false,
    "nameO": "레프트 슬립",
    "nameS": "라이트 슬립",
    "compat": {
@@ -155,6 +165,7 @@ const DATA = {
    "id": "slipRear",
    "type": "slip",
    "defense": true,
+   "special": false,
    "nameO": "라이트 슬립",
    "nameS": "레프트 슬립",
    "compat": {
@@ -170,6 +181,7 @@ const DATA = {
    "id": "duckLead",
    "type": "duck",
    "defense": true,
+   "special": false,
    "nameO": "레프트 더킹",
    "nameS": "라이트 더킹",
    "compat": {
@@ -185,6 +197,7 @@ const DATA = {
    "id": "duckRear",
    "type": "duck",
    "defense": true,
+   "special": false,
    "nameO": "라이트 더킹",
    "nameS": "레프트 더킹",
    "compat": {
@@ -200,6 +213,7 @@ const DATA = {
    "id": "weaveLead",
    "type": "weave",
    "defense": true,
+   "special": false,
    "nameO": "레프트 위빙",
    "nameS": "라이트 위빙",
    "compat": {
@@ -215,6 +229,7 @@ const DATA = {
    "id": "weaveRear",
    "type": "weave",
    "defense": true,
+   "special": false,
    "nameO": "라이트 위빙",
    "nameS": "레프트 위빙",
    "compat": {
@@ -230,6 +245,7 @@ const DATA = {
    "id": "pullBack",
    "type": "pull",
    "defense": true,
+   "special": false,
    "nameO": "스웨이",
    "nameS": "스웨이",
    "compat": {
@@ -245,6 +261,7 @@ const DATA = {
    "id": "backStep",
    "type": "step",
    "defense": true,
+   "special": false,
    "nameO": "백스텝",
    "nameS": "백스텝",
    "compat": {
@@ -255,6 +272,54 @@ const DATA = {
    "result": "center",
    "low": false,
    "freq": 0.4
+  },
+  {
+   "id": "jumpHook",
+   "type": "hook",
+   "defense": false,
+   "special": true,
+   "nameO": "점프 훅",
+   "nameS": "점프 훅",
+   "compat": {
+    "lead": 0.4,
+    "center": 1.0,
+    "rear": 0.9
+   },
+   "result": "rear",
+   "low": false,
+   "freq": 0.7
+  },
+  {
+   "id": "checkHook",
+   "type": "hook",
+   "defense": false,
+   "special": true,
+   "nameO": "체크 훅",
+   "nameS": "체크 훅",
+   "compat": {
+    "lead": 1.0,
+    "center": 0.7,
+    "rear": 0.1
+   },
+   "result": "center",
+   "low": false,
+   "freq": 0.8
+  },
+  {
+   "id": "overhand",
+   "type": "overhand",
+   "defense": false,
+   "special": true,
+   "nameO": "오버핸드",
+   "nameS": "오버핸드",
+   "compat": {
+    "lead": 0.1,
+    "center": 0.8,
+    "rear": 1.0
+   },
+   "result": "lead",
+   "low": false,
+   "freq": 0.8
   }
  ],
  "bonus": {
@@ -279,16 +344,32 @@ const DATA = {
   "weaveLead>leadHook": 1.5,
   "weaveRear>cross": 1.5,
   "pullBack>cross": 3.0,
-  "backStep>jab": 2.0
+  "backStep>jab": 2.0,
+  "jab>jumpHook": 1.4,
+  "duckLead>jumpHook": 2.0,
+  "duckRear>jumpHook": 1.6,
+  "jumpHook>cross": 1.8,
+  "cross>checkHook": 2.0,
+  "rearUpper>checkHook": 1.5,
+  "slipLead>checkHook": 1.5,
+  "jab>overhand": 1.6,
+  "slipRear>overhand": 2.0,
+  "weaveRear>overhand": 1.8,
+  "duckRear>overhand": 1.5,
+  "overhand>leadHook": 2.0
  },
  "levels": {
   "beginner": {
    "excluded": [
     "rearHook",
     "jabBody",
+    "duckLead",
+    "duckRear",
     "weaveLead",
     "weaveRear",
-    "pullBack"
+    "jumpHook",
+    "checkHook",
+    "overhand"
    ],
    "maxDefenses": 1,
    "defenseRate": 0.5,
@@ -296,30 +377,57 @@ const DATA = {
     0.2,
     0.45,
     0.35
-   ]
+   ],
+   "lowRate": 0.35,
+   "maxLow": 1,
+   "levelSwitch": 1.0,
+   "pairEmphasis": 1.6,
+   "variety": 1.0,
+   "specialRate": 1.0,
+   "maxSpecials": 0
   },
   "intermediate": {
-   "excluded": [],
-   "maxDefenses": 1,
+   "excluded": [
+    "jumpHook",
+    "checkHook",
+    "overhand"
+   ],
+   "maxDefenses": 2,
    "defenseRate": 0.8,
    "lengthWeights": [
-    0.1,
-    0.3,
+    0.05,
+    0.25,
     0.35,
-    0.25
-   ]
+    0.25,
+    0.1
+   ],
+   "lowRate": 1.3,
+   "maxLow": 3,
+   "levelSwitch": 1.8,
+   "pairEmphasis": 0.8,
+   "variety": 0.55,
+   "specialRate": 1.0,
+   "maxSpecials": 0
   },
   "advanced": {
    "excluded": [],
-   "maxDefenses": 1,
+   "maxDefenses": 2,
    "defenseRate": 1.0,
    "lengthWeights": [
-    0.06,
-    0.2,
-    0.3,
-    0.26,
-    0.18
-   ]
+    0.02,
+    0.1,
+    0.24,
+    0.28,
+    0.22,
+    0.14
+   ],
+   "lowRate": 1.2,
+   "maxLow": 3,
+   "levelSwitch": 1.6,
+   "pairEmphasis": 0.8,
+   "variety": 0.55,
+   "specialRate": 1.3,
+   "maxSpecials": 2
   }
  }
 };

@@ -91,7 +91,7 @@ class _ComboFigureState extends State<ComboFigure>
     _tileGuides = [for (final m in widget.moves) motionGuides(m)];
     _guides = [
       for (var i = 0; i < widget.moves.length; i++)
-        [for (final g in _tileGuides[i]) g.translated(_timeline.baseOf(i))],
+        [for (final g in _tileGuides[i]) g.mapped(_timeline.placeOf(i).apply)],
     ];
     _ctrl.duration =
         Duration(milliseconds: (_timeline.duration * 1000).round());

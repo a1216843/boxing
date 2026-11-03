@@ -139,14 +139,14 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 
 <div class="wrap">
   <header>
-    <a class="back" href="../">← 미트 콜</a>
+    <a class="back" href="../">← 홈</a>
     <h1>콤보 카드 지도</h1>
     <p class="lead">직전 동작이 끝난 뒤 체중이 어느 발에 실려 있는지에 따라 다음에 나올 수 있는 카드가 정해집니다. 앱의 콤보 생성기와 같은 값입니다. 카드를 누르면 그 동작 뒤의 자세 칸이 표시됩니다.</p>
     <div class="controls">
       <div><span class="seg-label">스탠스</span><span class="seg" role="group" aria-label="스탠스">
         <button id="st-o" aria-pressed="true">오소독스</button><button id="st-s" aria-pressed="false">사우스포</button></span></div>
       <div><span class="seg-label">레벨</span><span class="seg" role="group" aria-label="레벨">
-        <button id="lv-beginner" aria-pressed="false">초급</button><button id="lv-intermediate" aria-pressed="true">중급</button><button id="lv-advanced" aria-pressed="false">고급</button></span></div>
+        <button id="lv-beginner" aria-pressed="false">초급</button><button id="lv-intermediate" aria-pressed="true">중급</button><button id="lv-advanced" aria-pressed="false">상급</button></span></div>
     </div>
     <div class="legend">
       <span><b class="t-good">○</b> 자연스러움</span>
@@ -192,6 +192,7 @@ const STATES = [
 ];
 const stateTitle = k => STATES.find(s => s.key === k).title();
 const name = m => DISPLAY[m.id] || (stance === 'o' ? m.nameO : m.nameS);
+const punch = m => !m.defense;
 const img = id => `cards/${id}_${stance}.png`;
 const tier = v => v >= 0.8 ? 'good' : v >= THRESH ? 'ok' : 'bad';
 const active = () => DATA.moves.filter(m => !profile().excluded.includes(m.id));
@@ -210,12 +211,13 @@ function card(m, opts = {}) {
   el.className = `card ${cls}`;
   if (!opts.static) el.type = 'button';
   if (opts.disabled) el.disabled = true;
-  el.title = `${name(m)} → ${stateTitle(m.result)}${m.low ? ' (낮은 자세)' : ''}`;
+  const label = name(m);
+  el.title = `${label} → ${stateTitle(m.result)}${m.low ? ' (낮은 자세)' : ''}`;
   el.innerHTML = `
-    <span class="pic"><img src="${img(m.id)}" alt="${name(m)} 자세" loading="lazy"></span>
+    <span class="pic"><img src="${img(m.id)}" alt="${label} 자세" loading="lazy"></span>
     ${opts.bonus ? '<span class="val bonus">정석</span>' : ''}
-    ${m.defense ? '<span class="def">방어</span>' : ''}
-    <span class="name">${name(m)}</span>`;
+    ${m.defense ? '<span class="def">방어</span>' : m.special ? '<span class="def">상급</span>' : ''}
+    <span class="name">${label}</span>`;
   return el;
 }
 
@@ -275,22 +277,34 @@ function fitOf(m, s) {
   return { fit: m.compat[weight] * (bonus || 1), bonus };
 }
 function scoreOf(m, s, length) {
-  const { fit } = fitOf(m, s);
+  const { fit, bonus } = fitOf(m, s);
   if (fit < THRESH) return 0;
-  const { low } = stateAfter(s);
-  const prev = s[s.length - 1], idx = s.length;
-  let v = fit * m.freq;
+  const { weight, low } = stateAfter(s);
+  const p = profile(), prev = s[s.length - 1], idx = s.length;
+  let v = m.compat[weight] * Math.pow(bonus || 1, p.pairEmphasis) * m.freq;
+  if (m.special) {
+    if (s.filter(x => x.special).length >= p.maxSpecials || s.includes(m)) return 0;
+    v *= p.specialRate;
+  }
   if (m.defense) {
     if (length === 1) return 0;
-    if (s.filter(x => x.defense).length >= profile().maxDefenses) return 0;
+    if (s.filter(x => x.defense).length >= p.maxDefenses) return 0;
     if (m.type === 'step' && idx !== 0 && length && idx !== length - 1) return 0;
-    if (prev && prev.defense) v *= 0.15;
-    v *= profile().defenseRate;
+    if (prev && prev.defense) {
+      if (s.length >= 2 && s[s.length - 2].defense) return 0;
+      v *= 0.15;
+    }
+    v *= p.defenseRate;
   } else if (prev && prev.defense) v *= 1.4;
+  if (m.low) {
+    if (s.filter(x => x.low).length >= p.maxLow) return 0;
+    v *= p.lowRate;
+  }
+  if (prev && prev.low !== m.low) v *= p.levelSwitch;
   if (prev && prev.id === m.id) {
     if (s.length >= 2 && s[s.length - 2].id === m.id) return 0;
     v *= m.type === 'jab' ? 0.6 : 0.15;
-  }
+  } else if (punch(m) && m.type !== 'jab' && s.some(x => x.type === m.type)) v *= p.variety;
   if (idx === 0 && m.type === 'jab') v *= 1.8;
   if (low) v *= LOW_MULT[m.type] || 1;
   return v;
@@ -308,7 +322,7 @@ function renderBuilder() {
   document.getElementById('callout').textContent = seq.length ? seq.map(name).join(' · ') : '카드를 골라 콤보를 시작하세요';
   const { weight, low } = stateAfter(seq);
   const st = document.getElementById('status');
-  st.innerHTML = `<span>지금 자세</span>${feet(weight)}<span class="pill">${stateTitle(weight)}</span>${low ? '<span class="pill">낮은 자세: 어퍼·바디가 더 자주, 잽·스트레이트는 덜 나옴</span>' : ''}${seq.some(m => m.defense) ? '<span class="pill">방어는 콤보당 1개</span>' : ''}`;
+  st.innerHTML = `<span>지금 자세</span>${feet(weight)}<span class="pill">${stateTitle(weight)}</span>${low ? '<span class="pill">낮은 자세: 어퍼·바디가 더 자주, 잽·스트레이트는 덜 나옴</span>' : ''}${seq.some(m => m.defense) ? `<span class="pill">방어는 콤보당 ${profile().maxDefenses}개</span>` : ''}`;
 
   const next = document.getElementById('next');
   next.innerHTML = '';
@@ -338,7 +352,7 @@ function randomCombo() {
       if (!sc.some(v => v > 0)) { ok = false; break; }
       s.push(ms[pick(sc)]);
     }
-    if (ok && s.some(m => !m.defense)) return s;
+    if (ok && s.some(punch)) return s;
   }
   return [byId.jab, byId.cross];
 }

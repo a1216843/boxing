@@ -13,6 +13,7 @@ String comboMapDataJs() {
           'id': m.id,
           'type': m.type.name,
           'defense': m.isDefense,
+          'special': m.special,
           'nameO': m.call(Stance.orthodox, CallStyle.name),
           'nameS': m.call(Stance.southpaw, CallStyle.name),
           'compat': {for (final e in m.compat.entries) e.key.name: e.value},
@@ -25,10 +26,17 @@ String comboMapDataJs() {
     'levels': {
       for (final l in Level.values)
         l.name: {
-          'excluded': l.profile.excluded.toList(),
+          'excluded': [for (final m in Moves.all) if (!l.profile.allows(m)) m.id],
           'maxDefenses': l.profile.maxDefenses,
           'defenseRate': l.profile.defenseRate,
           'lengthWeights': l.profile.lengthWeights,
+          'lowRate': l.profile.lowRate,
+          'maxLow': l.profile.maxLow,
+          'levelSwitch': l.profile.levelSwitch,
+          'pairEmphasis': l.profile.pairEmphasis,
+          'variety': l.profile.variety,
+          'specialRate': l.profile.specialRate,
+          'maxSpecials': l.profile.maxSpecials,
         },
     },
   };

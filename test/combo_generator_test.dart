@@ -62,6 +62,63 @@ void main() {
     });
   }
 
+  group('난이도 구분', () {
+    final sample = {for (final l in Level.values) l: _sample(TrainingSettings(level: l), n: 4000)};
+    double avg(Level l, num Function(Combo c) f) =>
+        sample[l]!.map(f).reduce((a, b) => a + b) / sample[l]!.length;
+    int lows(Combo c) => c.moves.where((m) => m.changesLevel).length;
+    int ups(Combo c) {
+      var n = 0;
+      for (var i = 1; i < c.moves.length; i++) {
+        if (c.moves[i - 1].changesLevel != c.moves[i].changesLevel) n++;
+      }
+      return n;
+    }
+
+    test('초급은 레벨 체인지가 적고, 중급은 위아래를 자주 오간다', () {
+      expect(avg(Level.beginner, lows), lessThan(0.3));
+      expect(avg(Level.intermediate, lows), greaterThan(avg(Level.beginner, lows) * 4));
+      expect(avg(Level.intermediate, ups), greaterThan(avg(Level.beginner, ups) * 4));
+      for (final c in sample[Level.beginner]!) {
+        expect(lows(c), lessThanOrEqualTo(1), reason: c.key);
+      }
+    });
+
+    test('초급은 기본 콤보 위주, 중급은 조합이 다양하다', () {
+      int distinct(Level l) => sample[l]!.map((c) => c.key).toSet().length;
+      double share(Level l, Set<String> keys) =>
+          sample[l]!.where((c) => keys.contains(c.key)).length / sample[l]!.length;
+      const basics = {'jab', 'jab-cross', 'jab-cross-leadHook', 'cross-leadHook', 'jab-jab-cross'};
+      expect(share(Level.beginner, basics), greaterThan(share(Level.intermediate, basics) * 2));
+      expect(distinct(Level.intermediate), greaterThan(distinct(Level.beginner) * 3));
+    });
+
+    test('상급 기술은 상급에서만, 상급에선 모두 나온다', () {
+      for (final l in [Level.beginner, Level.intermediate]) {
+        for (final c in sample[l]!) {
+          expect(c.moves.any((m) => m.special), isFalse, reason: c.key);
+        }
+      }
+      final adv = sample[Level.advanced]!;
+      for (final id in Moves.specialIds) {
+        expect(adv.where((c) => c.moves.any((m) => m.id == id)).length, greaterThan(40), reason: id);
+      }
+      expect(adv.where((c) => c.moves.any((m) => m.special)).length, greaterThan(adv.length * 0.35));
+    });
+
+    test('상급 기술 규칙: 콤보당 개수 제한, 같은 기술은 한 번', () {
+      for (final c in sample[Level.advanced]!) {
+        final m = c.moves;
+        expect(m.where((x) => x.special).length, lessThanOrEqualTo(Level.advanced.profile.maxSpecials), reason: c.key);
+        expect(m.where((x) => x.special).map((x) => x.id).toSet().length, m.where((x) => x.special).length, reason: c.key);
+      }
+    });
+
+    test('상급은 중급보다 길다', () {
+      expect(avg(Level.advanced, (c) => c.moves.length), greaterThan(avg(Level.intermediate, (c) => c.moves.length) + 0.3));
+    });
+  });
+
   test('방어/바디 끄면 안 나온다', () {
     final combos = _sample(const TrainingSettings(includeDefense: false, includeBody: false));
     for (final c in combos) {
