@@ -62,7 +62,7 @@ ArmTarget _arm(Arm arm, double side, double yaw) {
     // 어퍼: 몸 앞 아래에서 앞·위 대각선으로 올라가 상대 턱 밑을 친다. 앞팔은 앞으로 기울어 있다.
     Arm.uppercut => aimed(V3(side * 0.03, 0.1, 0.56), V3(side * 0.3, -1, -0.45)),
     Arm.bodyHook => aimed(const V3(0.02, -0.12, 0.46), V3(side, -0.2, 0)),
-    // 오버핸드: 팔꿈치를 바깥 위로 들고 주먹이 위에서 비스듬히 내려꽂힌다. 팔은 다 펴지 않는다.
+    // 오버핸드 훅: 팔꿈치를 바깥 위로 들고 주먹이 위에서 비스듬히 내려꽂힌다. 팔은 다 펴지 않는다.
     Arm.overhand => aimed(const V3(0.14, 0.26, 0.56), V3(side, 0.4, -0.2)),
   };
 }
@@ -631,7 +631,7 @@ Pose strikePose(Move m) => switch (m.id) {
       // 체크 훅: 리드 훅을 맞히는 순간 이미 앞발을 축으로 돌기 시작한다 (끝까지 돌면 [_pivotTurn]).
       'checkHook' => Pose(
           lead: Arm.hook, yaw: 75, hipYaw: 50, shiftX: 0.02, leadPivot: 15, leadHeel: 0.3).turned(_pivotTurn * 0.2),
-      // 오버핸드: 리드 쪽으로 머리를 숙여 상대 잽 위로 넘겨 친다. 크로스보다 낮게, 더 기울인다.
+      // 오버핸드 훅: 리드 쪽으로 머리를 숙여 상대 잽 위로 넘겨 친다. 크로스보다 낮게, 더 기울인다.
       'overhand' => Pose(
           rear: Arm.overhand, yaw: -25, hipYaw: -10, shiftX: -0.06, shiftZ: 0.07, drop: 0.06,
           pitch: 14, roll: -14, rearPivot: 20, rearHeel: 0.6).feet(0.04, 0),
@@ -645,7 +645,7 @@ Skeleton peakSkeleton(Move m) => strikePose(m).build();
 /// (위빙으로 옆으로 각도를 잡는 발놀림이 화면에서 보이도록).
 V3 focusOf(Skeleton s) => V3(0.05, 0, (s[J.leadToe].z + s[J.rearToe].z) / 2);
 
-/// 오버핸드가 가는 도중 주먹이 지나가는 쪽 (치는 손 기준 몸통 좌표 오프셋). 바깥 위로 돌아 휜다.
+/// 오버핸드 훅이 가는 도중 주먹이 지나가는 쪽 (치는 손 기준 몸통 좌표 오프셋). 바깥 위로 돌아 휜다.
 /// 치기 전에 뒤로 감는 준비 동작은 실제 선수에게 거의 없다. 손목이 20% 움직이는 시점이 실제 27~58ms인데
 /// 준비 동작을 넣으면 70~97ms로 늦어진다. 훅은 [_hookVia], 어퍼는 [_upperVia]로 따로 그린다.
 V3? _arc(Move m) => switch (m.id) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+import 'voices.dart';
 import 'web/speech_unlock_stub.dart'
     if (dart.library.js_interop) 'web/speech_unlock_web.dart' as web_speech;
 
@@ -13,6 +14,12 @@ class Speaker {
   Completer<void> _cut = Completer<void>();
   int _generation = 0;
   bool _ready = false;
+
+  /// 고른 음성 이름. 비어 있으면 자동 (가장 자연스러운 한국어 음성).
+  String _preferred = '';
+
+  /// 실제로 적용한 음성. 웹은 음성 목록을 늦게 불러오므로 적용될 때까지 말하기 전마다 다시 시도한다.
+  TtsVoice? _applied;
 
   static const _maxUtterance = Duration(seconds: 6);
 
@@ -37,14 +44,41 @@ class Speaker {
     await _tts.setPitch(1.0);
   }
 
+  /// 기기에 있는 한국어 음성 (자연스러운 순서).
+  Future<List<TtsVoice>> voices() async {
+    try {
+      final raw = await _tts.getVoices;
+      return raw is List ? koreanVoices(raw) : const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// 쓸 음성을 정한다. 빈 문자열은 자동.
+  Future<void> setVoice(String name) async {
+    if (name != _preferred) _applied = null;
+    _preferred = name;
+    await _applyVoice();
+  }
+
+  Future<void> _applyVoice() async {
+    if (_applied != null) return;
+    final pick = pickVoice(await voices(), _preferred);
+    if (pick == null) {
+      // 브라우저가 아직 음성 목록을 못 불러왔으면 언어만이라도 한국어로 (목록이 생기면 그때 고른다).
+      if (kIsWeb) await _tts.setLanguage('ko-KR');
+      return;
+    }
+    try {
+      await _tts.setVoice(pick.toMap());
+      _applied = pick;
+    } catch (_) {}
+  }
+
   /// [rate]는 모바일 기준 (0.5 = 보통). 웹 음성은 1.0이 보통이라 두 배로 바꾼다.
   Future<void> setRate(double rate) async {
-    if (kIsWeb) {
-      // 브라우저는 음성 목록을 늦게 불러와서, 시작할 때 고른 한국어 음성이 비어 있을 수 있다.
-      await _tts.setLanguage('ko-KR');
-      return _tts.setSpeechRate(rate * 2);
-    }
-    await _tts.setSpeechRate(rate);
+    await _applyVoice();
+    await _tts.setSpeechRate(kIsWeb ? rate * 2 : rate);
   }
 
   /// 웹(iOS Safari)에서 첫 음성을 열어둔다. 버튼 탭 핸들러 안에서 바로 불러야 한다.
@@ -57,6 +91,7 @@ class Speaker {
     final next = _queue.then((_) async {
       if (generation != _generation) return;
       try {
+        if (_applied == null) await _applyVoice();
         await Future.any<void>([
           _tts.speak(text).then((_) {}),
           _cut.future,

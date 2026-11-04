@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../engine/combo_generator.dart';
 import '../engine/speaker.dart';
+import '../engine/voices.dart';
 import '../models/moves.dart';
 import '../models/settings.dart';
 import 'session_screen.dart';
@@ -19,6 +21,7 @@ class MeetCallScreen extends StatefulWidget {
 class _MeetCallScreenState extends State<MeetCallScreen> {
   TrainingSettings? _settings;
   List<String> _samples = const [];
+  List<TtsVoice> _voices = const [];
 
   @override
   void initState() {
@@ -36,6 +39,20 @@ class _MeetCallScreenState extends State<MeetCallScreen> {
       _settings = s;
       _samples = _makeSamples(s);
     });
+    await _loadVoices();
+  }
+
+  /// 브라우저는 음성 목록을 늦게 불러와서, 비어 있으면 잠시 뒤 한 번 더 읽는다.
+  Future<void> _loadVoices() async {
+    for (var i = 0; i < 4; i++) {
+      final v = await widget.speaker.voices();
+      if (!mounted) return;
+      if (v.isNotEmpty) {
+        setState(() => _voices = v);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+    }
   }
 
   List<String> _makeSamples(TrainingSettings s) {
@@ -64,6 +81,7 @@ class _MeetCallScreenState extends State<MeetCallScreen> {
   Future<void> _preview(String call) async {
     widget.speaker.unlock();
     await widget.speaker.interrupt();
+    await widget.speaker.setVoice(_settings!.voice);
     await widget.speaker.setRate(_settings!.speechRate);
     // 화면용 구분점(" · ")을 쉼표로 바꿔 실제 세션처럼 끊어 읽는다.
     await widget.speaker.say(call.replaceAll(' · ', ', '));
@@ -189,6 +207,15 @@ class _MeetCallScreenState extends State<MeetCallScreen> {
             divisions: 9,
             onChanged: (v) => _update(s.copyWith(speechRate: v)),
           ),
+          _VoiceTile(
+            voices: _voices,
+            selected: s.voice,
+            onChanged: (v) {
+              _update(s.copyWith(voice: v));
+              _preview('잽, 투, 훅. 라운드 1, 시작');
+            },
+            onPreview: () => _preview('잽, 투, 훅. 라운드 1, 시작'),
+          ),
           _SliderTile(
             title: '같은 콤보 연속 횟수',
             subtitle: '한 번 놓쳐도 다음에 다시 칠 수 있게',
@@ -245,6 +272,68 @@ class _MeetCallScreenState extends State<MeetCallScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 목소리 고르기. 기기에 있는 한국어 음성 중 자연스러운 순으로, 맨 위는 자동.
+class _VoiceTile extends StatelessWidget {
+  const _VoiceTile({required this.voices, required this.selected, required this.onChanged, required this.onPreview});
+
+  final List<TtsVoice> voices;
+  final String selected;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onPreview;
+
+  /// 기기마다 더 자연스러운 음성을 얻는 방법.
+  static String get _hint {
+    // 아이폰 사파리(웹)도 기기의 음성을 쓰므로 아이폰 설정 안내를 보여 준다.
+    if (kIsWeb && defaultTargetPlatform != TargetPlatform.iOS) {
+      return '마이크로소프트 엣지에서 열면 가장 자연스러운 음성(Natural)을 쓸 수 있어요.';
+    }
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS =>
+        '설정 > 손쉬운 사용 > 읽기 및 말하기 > 음성 > 한국어에서 "향상됨"·"고품질" 음성을 내려받으면 더 자연스러워요.',
+      TargetPlatform.android => '설정 > 텍스트 음성 변환에서 Google 음성 엔진과 한국어 음성 데이터를 설치하면 더 자연스러워요.',
+      _ => '',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final known = selected.isEmpty || voices.any((v) => v.name == selected);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('목소리', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: known ? selected : '',
+                  items: [
+                    DropdownMenuItem(
+                      value: '',
+                      child: Text(voices.isEmpty ? '자동' : '자동 (${voices.first.label})',
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    for (final v in voices)
+                      DropdownMenuItem(value: v.name, child: Text(v.label, overflow: TextOverflow.ellipsis)),
+                  ],
+                  onChanged: (v) => onChanged(v ?? ''),
+                ),
+              ),
+              IconButton(tooltip: '미리 듣기', icon: const Icon(Icons.volume_up), onPressed: onPreview),
+            ],
+          ),
+          if (_hint.isNotEmpty) Text(_hint, style: theme.textTheme.bodySmall),
+        ],
       ),
     );
   }

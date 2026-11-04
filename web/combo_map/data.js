@@ -310,8 +310,8 @@ const DATA = {
    "type": "overhand",
    "defense": false,
    "special": true,
-   "nameO": "오버핸드",
-   "nameS": "오버핸드",
+   "nameO": "오버핸드 훅",
+   "nameS": "오버핸드 훅",
    "compat": {
     "lead": 0.1,
     "center": 0.8,

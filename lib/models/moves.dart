@@ -75,7 +75,7 @@ class Move {
   /// 기본 출현 빈도.
   final double freq;
 
-  /// 상급 기술 (점프 훅, 체크 훅, 오버핸드). 상급에서만 나온다.
+  /// 상급 기술 (점프 훅, 체크 훅, 오버핸드 훅). 상급에서만 나온다.
   final bool special;
 
   bool get isDefense => _defenseTypes.contains(type);
@@ -293,11 +293,11 @@ abstract final class Moves {
     freq: 0.8,
     special: true,
   );
-  // 오버핸드: 리어 손을 위에서 아래로 넘겨 치는 큰 펀치. 리드 쪽으로 머리를 숙이며 체중을 앞으로 싣는다.
+  // 오버핸드 훅: 리어 손을 위에서 아래로 넘겨 치는 큰 펀치. 리드 쪽으로 머리를 숙이며 체중을 앞으로 싣는다.
   static const overhand = Move(
     id: 'overhand',
     type: MoveType.overhand,
-    nameCall: '오버핸드',
+    nameCall: '오버핸드 훅',
     duration: 0.6,
     compat: {Weight.lead: 0.1, Weight.center: 0.8, Weight.rear: 1.0},
     result: Weight.lead,

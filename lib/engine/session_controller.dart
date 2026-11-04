@@ -125,6 +125,7 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> _run(int token) async {
+    await _speaker.setVoice(settings.voice);
     await _speaker.setRate(settings.speechRate);
     for (var r = 1; r <= settings.rounds; r++) {
       if (!_alive(token)) return;

@@ -83,7 +83,7 @@ class LevelProfile {
 enum Level {
   beginner('초급', '원투, 원투쓰리 같은 기본 콤보 위주. 바디·높이 변화는 가끔'),
   intermediate('중급', '바디샷·더킹·위빙으로 위아래를 오가며 여러 조합을 섞음'),
-  advanced('상급', '길게 이어 치는 연타, 피하고 바로 받아치는 연결. 점프 훅·체크 훅·오버핸드도 섞음');
+  advanced('상급', '길게 이어 치는 연타, 피하고 바로 받아치는 연결. 점프 훅·체크 훅·오버핸드 훅도 섞음');
 
   const Level(this.label, this.description);
   final String label;
@@ -93,7 +93,7 @@ enum Level {
 
   /// 초급: 기본 콤보(원투, 원투쓰리 등) 위주, 높이 변화는 가끔.
   /// 중급: 레벨 체인지를 섞어 위아래를 오가고, 여러 조합을 고르게.
-  /// 상급: 중급보다 길게 이어 치고, 피하고 받아치는 연결을 더 섞는다. 점프 훅·체크 훅·오버핸드도 나온다.
+  /// 상급: 중급보다 길게 이어 치고, 피하고 받아치는 연결을 더 섞는다. 점프 훅·체크 훅·오버핸드 훅도 나온다.
   LevelProfile get profile => switch (this) {
         Level.beginner => const LevelProfile(
             lengthWeights: [0.2, 0.45, 0.35],
@@ -162,6 +162,7 @@ class TrainingSettings {
     this.restSeconds = 60,
     this.rounds = 3,
     this.speechRate = 0.55,
+    this.voice = '',
     this.repeatRatio = 0.4,
     this.comboRepeats = 2,
   });
@@ -182,6 +183,9 @@ class TrainingSettings {
   final int rounds;
   final double speechRate;
 
+  /// TTS 음성 이름. 비어 있으면 자동 (기기에서 가장 자연스러운 한국어 음성).
+  final String voice;
+
   /// 이미 나온 콤보를 다시 부를 확률. 높을수록 패턴이 몸에 익는다.
   final double repeatRatio;
 
@@ -200,6 +204,7 @@ class TrainingSettings {
     int? restSeconds,
     int? rounds,
     double? speechRate,
+    String? voice,
     double? repeatRatio,
     int? comboRepeats,
   }) {
@@ -215,6 +220,7 @@ class TrainingSettings {
       restSeconds: restSeconds ?? this.restSeconds,
       rounds: rounds ?? this.rounds,
       speechRate: speechRate ?? this.speechRate,
+      voice: voice ?? this.voice,
       repeatRatio: repeatRatio ?? this.repeatRatio,
       comboRepeats: comboRepeats ?? this.comboRepeats,
     );
@@ -232,6 +238,7 @@ class TrainingSettings {
         'restSeconds': restSeconds,
         'rounds': rounds,
         'speechRate': speechRate,
+        'voice': voice,
         'repeatRatio': repeatRatio,
         'comboRepeats': comboRepeats,
       };
@@ -252,6 +259,7 @@ class TrainingSettings {
       restSeconds: (j['restSeconds'] as num?)?.toInt() ?? d.restSeconds,
       rounds: (j['rounds'] as num?)?.toInt() ?? d.rounds,
       speechRate: (j['speechRate'] as num?)?.toDouble() ?? d.speechRate,
+      voice: j['voice'] as String? ?? d.voice,
       repeatRatio: (j['repeatRatio'] as num?)?.toDouble() ?? d.repeatRatio,
       comboRepeats: (j['comboRepeats'] as num?)?.toInt() ?? d.comboRepeats,
     );

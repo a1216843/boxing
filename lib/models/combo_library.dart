@@ -73,9 +73,9 @@ const Map<Level, List<ComboExample>> comboLibrary = {
         '원투쓰리투로 몰아친 뒤 반격하며 돌진해 들어오는 상대에게 훅을 맞히고 앞발로 돌아 옆으로 빠진다.'),
     ComboExample('더킹 점프 훅 연타', [Moves.duckLead, Moves.jumpHook, Moves.cross, Moves.leadHook, Moves.cross],
         '상대 스트레이트 아래로 숙였다가 뒷손 쪽으로 뛰어 들어가 훅, 잡은 각에서 투-훅-투.'),
-    ComboExample('슬립 오버핸드 바디', [Moves.slipRear, Moves.overhand, Moves.leadBody, Moves.leadHook],
-        '상대 잽을 바깥으로 흘리며 그 위로 오버핸드, 시선이 올라간 사이 바디-헤드 훅.'),
-    ComboExample('위빙 오버핸드', [Moves.jab, Moves.weaveRear, Moves.overhand, Moves.leadHook, Moves.cross],
-        '상대 훅을 위빙으로 흘리고 뒷발에 실린 체중으로 오버핸드-훅-스트레이트.'),
+    ComboExample('슬립 오버핸드 훅 바디', [Moves.slipRear, Moves.overhand, Moves.leadBody, Moves.leadHook],
+        '상대 잽을 바깥으로 흘리며 그 위로 오버핸드 훅, 시선이 올라간 사이 바디-헤드 훅.'),
+    ComboExample('위빙 오버핸드 훅', [Moves.jab, Moves.weaveRear, Moves.overhand, Moves.leadHook, Moves.cross],
+        '상대 훅을 위빙으로 흘리고 뒷발에 실린 체중으로 오버핸드 훅-리드 훅-스트레이트.'),
   ],
 };
