@@ -20,6 +20,14 @@ class CombinationListScreen extends StatefulWidget {
 
 class _CombinationListScreenState extends State<CombinationListScreen> {
   late Level _level = widget.settings.level;
+  late CallStyle _callStyle = widget.settings.callStyle;
+
+  /// 고른 콜 방식은 미트 콜과 같은 설정에 저장한다 (다음에 열 때도, 미트 콜에서도 그대로).
+  Future<void> _setCallStyle(CallStyle v) async {
+    setState(() => _callStyle = v);
+    final saved = await SettingsStore.load();
+    await SettingsStore.save(saved.copyWith(callStyle: v));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +50,14 @@ class _CombinationListScreenState extends State<CombinationListScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Text(_level.description, style: Theme.of(context).textTheme.bodySmall),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: SegmentedButton<CallStyle>(
+              segments: [for (final v in CallStyle.values) ButtonSegment(value: v, label: Text(v.label))],
+              selected: {_callStyle},
+              onSelectionChanged: (v) => _setCallStyle(v.first),
+            ),
+          ),
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.only(bottom: 24),
@@ -55,7 +71,7 @@ class _CombinationListScreenState extends State<CombinationListScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 2),
-                      Text(Combo(e.moves).call(s.stance, s.callStyle),
+                      Text(Combo(e.moves).call(s.stance, _callStyle),
                           style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.primary)),
                       const SizedBox(height: 2),
                       Text(e.note),
@@ -63,7 +79,7 @@ class _CombinationListScreenState extends State<CombinationListScreen> {
                   ),
                   trailing: const Icon(Icons.play_circle_outline),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => CombinationDemoScreen(example: e, stance: s.stance, callStyle: s.callStyle),
+                    builder: (_) => CombinationDemoScreen(example: e, stance: s.stance, callStyle: _callStyle),
                   )),
                 );
               },
