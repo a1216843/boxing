@@ -7,7 +7,7 @@ import '../models/settings.dart';
 import 'combination_screen.dart';
 import 'meet_call_screen.dart';
 
-/// 홈: 미트 콜, 콤보 카드 맵, 콤비네이션 보기.
+/// 홈: 미트 콜, 콤보 카드 맵, 콤비네이션 보기, 피드백 게시판.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.speaker});
 
@@ -33,12 +33,19 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 콤보 카드 맵 (web/combo_map/, GitHub Pages에 웹 버전과 함께 배포).
   Future<void> _openComboMap() async {
     final s = await _settings();
-    final query = 'stance=${s.stance.name}&level=${s.level.name}';
+    await _openWebPage('combo_map/?stance=${s.stance.name}&level=${s.level.name}', '콤보 카드 맵');
+  }
+
+  /// 피드백 게시판 (web/feedback/, 글은 Supabase에 저장).
+  Future<void> _openFeedback() => _openWebPage('feedback/', '피드백 게시판');
+
+  /// 앱과 함께 배포되는 웹 페이지를 연다.
+  Future<void> _openWebPage(String path, String name) async {
     // 웹은 앱과 같은 사이트라 같은 탭에서 이동하고(페이지의 "← 홈"으로 돌아옴), 폰 앱은 브라우저로 연다.
-    final uri = kIsWeb ? Uri.base.resolve('combo_map/?$query') : Uri.parse('$_webAppUrl/combo_map/?$query');
+    final uri = kIsWeb ? Uri.base.resolve(path) : Uri.parse('$_webAppUrl/$path');
     final ok = await launchUrl(uri, webOnlyWindowName: '_self');
     if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('콤보 카드 맵을 열지 못했어요')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name을 열지 못했어요')));
     }
   }
 
@@ -66,6 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
             title: '콤비네이션 보기',
             body: '난이도별 콤비네이션을 골라, 상대가 있을 때 어떻게 쓰이는지 두 인형의 시연으로 봅니다.',
             onTap: _openCombinations,
+          ),
+          _MenuCard(
+            icon: Icons.forum_outlined,
+            title: '피드백 게시판',
+            body: '불편한 점이나 바라는 기능을 남겨 주세요. 로그인 없이 비밀번호만 정해 쓰고, 그 비밀번호로 고치거나 지울 수 있어요.',
+            onTap: _openFeedback,
           ),
         ],
       ),

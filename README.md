@@ -6,13 +6,14 @@
 
 ## 기능
 
-홈에서 세 가지를 고릅니다.
+홈에서 네 가지를 고릅니다.
 
 - **미트 콜**: 난이도·스탠스·콜 방식을 고르고 라운드를 시작하면 콤보를 TTS로 불러 주고 인형이 따라 칩니다.
 - **콤보 카드 맵**: 자세(체중)마다 다음에 이어질 수 있는 동작을 카드로 보는 웹 페이지 (`web/combo_map/`).
 - **콤비네이션 보기**: 난이도별 콤보 목록(`lib/models/combo_library.dart`)에서 하나를 고르면 상대 인형과 함께 시연합니다.
   내가 치면 상대가 맞고(머리가 젖혀지거나 몸이 접힘), 내가 피하면 상대가 그 회피에 맞는 펀치를 칩니다
   (리어 쪽 슬립·스웨이·백스텝 ← 잽, 리드 쪽 슬립 ← 스트레이트, 더킹·위빙 ← 뒷손 훅). `lib/pose/sparring.dart`
+- **피드백 게시판**: 로그인 없이 닉네임·비밀번호만 정해 글을 쓰고, 그 비밀번호로 자기 글을 고치거나 지웁니다 (`web/feedback/`).
 
 ## 실행
 
@@ -36,6 +37,18 @@ iOS 빌드는 macOS + Xcode가 필요합니다.
 flutter build web --release --no-web-resources-cdn   # 로컬 빌드: build/web
 ```
 
+## 피드백 게시판 연결 (처음 한 번)
+
+GitHub Pages는 글을 저장할 수 없어서 글은 Supabase(무료)에 저장합니다.
+
+1. https://supabase.com 에서 프로젝트를 만든다.
+2. 대시보드 → **SQL Editor**에 `supabase/feedback.sql`을 통째로 붙여 넣고 Run.
+3. **Project Settings → API**에서 Project URL과 공개 키(anon 또는 `sb_publishable_…`)를 `web/feedback/config.js`에 넣고 `main`에 올린다.
+   공개 키는 브라우저에 노출되도록 만들어진 키라 저장소에 올려도 됩니다. `service_role`/`sb_secret_…` 키는 절대 넣지 않습니다.
+
+공개 키로는 테이블에 직접 접근할 수 없고 SQL 파일의 함수(목록·작성·수정·삭제)만 부를 수 있습니다.
+비밀번호는 bcrypt 해시로만 저장합니다. 관리자는 대시보드 Table Editor에서 아무 글이나 지울 수 있습니다.
+
 ## 구조
 
 | 파일 | 역할 |
@@ -48,7 +61,8 @@ flutter build web --release --no-web-resources-cdn   # 로컬 빌드: build/web
 | `lib/engine/speaker.dart` | TTS 큐 |
 | `lib/models/combo_library.dart` | 콤비네이션 보기 목록 (난이도별) |
 | `lib/pose/sparring.dart` | 상대 인형: 내 동작에 맞춘 맞기·공격, 마주 선 거리 |
-| `lib/screens/home_screen.dart` | 홈 (세 기능) |
+| `lib/screens/home_screen.dart` | 홈 (네 기능) |
+| `web/feedback/`, `supabase/feedback.sql` | 피드백 게시판 페이지와 Supabase 테이블·함수 |
 | `lib/screens/meet_call_screen.dart` | 미트 콜 설정·시작 |
 | `lib/screens/combination_screen.dart` | 콤비네이션 목록과 시연 |
 

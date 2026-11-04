@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 피드백 게시판. 글은 Supabase에 저장한다 (supabase/feedback.sql, 설정은 config.js). -->
+<title>피드백 게시판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+:root {
+  --bg: #f6f3f1;
+  --fg: #1d1716;
+  --muted: #6e625f;
+  --line: #ddd3cf;
+  --panel: #ffffff;
+  --field: #fbf9f8;
+  --accent: #d93a3a;
+  --accent-fg: #ffffff;
+  --accent-soft: #f7dcdc;
+  --good: #2f8a4f;
+  --display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151010; --fg: #f1e9e7; --muted: #a8988f; --line: #3a2c2a; --panel: #1e1716; --field: #191312;
+    --accent: #ff5f57; --accent-fg: #1a0d0c; --accent-soft: #3d1c1b; --good: #5cc785;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151010; --fg: #f1e9e7; --muted: #a8988f; --line: #3a2c2a; --panel: #1e1716; --field: #191312;
+  --accent: #ff5f57; --accent-fg: #1a0d0c; --accent-soft: #3d1c1b; --good: #5cc785;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 720px; margin: 0 auto; display: grid; gap: 24px; }
+h1, h2 { font-family: var(--display); font-weight: 400; margin: 0; }
+h1 { font-size: clamp(30px, 6vw, 40px); line-height: 1.1; }
+h2 { font-size: 20px; }
+p { margin: 0; }
+header { display: grid; gap: 12px; }
+.back { font-size: 14px; color: var(--muted); text-decoration: none; justify-self: start; }
+.back:hover { color: var(--accent); }
+.lead { color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+input, textarea {
+  font: inherit; color: var(--fg); background: var(--field); border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 12px; width: 100%; min-width: 0;
+}
+textarea { min-height: 120px; resize: vertical; }
+input:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button {
+  font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  padding: 7px 16px; border-radius: 999px; cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 700; }
+button:disabled { opacity: .5; cursor: default; }
+.hint { font-size: 13px; color: var(--muted); }
+.msg { font-size: 14px; min-height: 1.6em; }
+.msg.err { color: var(--accent); }
+.msg.ok { color: var(--good); }
+.list { display: grid; gap: 10px; }
+.post { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+.post summary { list-style: none; cursor: pointer; padding: 14px 18px; display: grid; gap: 2px; }
+.post summary::-webkit-details-marker { display: none; }
+.post[open] summary { border-bottom: 1px solid var(--line); }
+.post-title { font-weight: 700; overflow-wrap: anywhere; }
+.post-meta { font-size: 13px; color: var(--muted); }
+.post-body { padding: 14px 18px; display: grid; gap: 14px; }
+.post-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.auth { display: grid; gap: 10px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.empty { color: var(--muted); text-align: center; padding: 28px 0; }
+.setup { background: var(--accent-soft); border-radius: 14px; padding: 16px 18px; }
+.count { font-size: 14px; color: var(--muted); font-weight: 400; font-family: var(--body); margin-left: 6px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="../">← 홈</a>
+    <h1>피드백 게시판</h1>
+    <p class="lead">불편한 점, 바라는 기능, 콤보나 동작이 이상한 곳을 남겨 주세요. 로그인은 필요 없고,
+      글을 쓸 때 정한 비밀번호로 나중에 고치거나 지울 수 있습니다.</p>
+  </header>
+
+  <p class="setup" id="setup" hidden>게시판이 아직 연결되지 않았습니다. 관리자가 <code>web/feedback/config.js</code>에
+    Supabase 주소와 공개 키를 넣으면 열립니다.</p>
+
+  <form class="panel" id="write" autocomplete="off">
+    <h2>글쓰기</h2>
+    <div class="row">
+      <label>닉네임<input name="nickname" maxlength="20" required></label>
+      <label>비밀번호 (수정·삭제용, 4자 이상)<input name="password" type="password" minlength="4" maxlength="72" required autocomplete="new-password"></label>
+    </div>
+    <label>제목<input name="title" maxlength="100" required></label>
+    <label>내용<textarea name="body" maxlength="3000" required></textarea></label>
+    <div class="actions">
+      <button class="primary" type="submit">올리기</button>
+      <span class="hint">비밀번호는 암호화해 저장하며, 잊으면 글을 고칠 수 없습니다.</span>
+    </div>
+    <p class="msg" id="write-msg" role="status"></p>
+  </form>
+
+  <section class="list" aria-labelledby="list-title">
+    <h2 id="list-title">글 목록<span class="count" id="count"></span></h2>
+    <div class="list" id="posts"></div>
+    <p class="msg" id="list-msg" role="status"></p>
+    <div class="actions"><button type="button" id="more" hidden>더 보기</button></div>
+  </section>
+</div>
+
+<template id="post-tpl">
+  <details class="post">
+    <summary>
+      <span class="post-title"></span>
+      <span class="post-meta"></span>
+    </summary>
+    <div class="post-body">
+      <p class="post-text"></p>
+      <div class="actions">
+        <button type="button" data-act="edit">수정</button>
+        <button type="button" data-act="delete">삭제</button>
+      </div>
+      <form class="auth" hidden>
+        <label data-edit>제목<input name="title" maxlength="100" required></label>
+        <label data-edit>내용<textarea name="body" maxlength="3000" required></textarea></label>
+        <label>비밀번호<input name="password" type="password" maxlength="72" required autocomplete="current-password"></label>
+        <div class="actions">
+          <button class="primary" type="submit"></button>
+          <button type="button" data-act="cancel">취소</button>
+        </div>
+        <p class="msg" role="status"></p>
+      </form>
+    </div>
+  </details>
+</template>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  const cfg = window.FEEDBACK_CONFIG || {};
+  const PAGE = 20;
+  const $ = (id) => document.getElementById(id);
+  const ready = Boolean(cfg.url && cfg.key);
+
+  // Supabase RPC 호출. 새 공개 키(sb_publishable_…)는 JWT가 아니라 apikey 헤더로만 보낸다.
+  async function rpc(name, args) {
+    const headers = { 'Content-Type': 'application/json', apikey: cfg.key };
+    if (!cfg.key.startsWith('sb_')) headers.Authorization = `Bearer ${cfg.key}`;
+    const res = await fetch(`${cfg.url.replace(/\/$/, '')}/rest/v1/rpc/${name}`, {
+      method: 'POST', headers, body: JSON.stringify(args),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && data.message) || `요청 실패 (${res.status})`);
+    return data;
+  }
+
+  const fmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+  const when = (iso) => fmt.format(new Date(iso));
+
+  function say(el, text, kind) {
+    el.textContent = text;
+    el.className = `msg${kind ? ` ${kind}` : ''}`;
+  }
+
+  // 글 하나. 사용자가 쓴 내용은 모두 textContent로 넣는다 (HTML로 해석하지 않음).
+  function renderPost(p) {
+    const node = $('post-tpl').content.firstElementChild.cloneNode(true);
+    const fill = (q) => {
+      node.querySelector('.post-title').textContent = q.title;
+      node.querySelector('.post-meta').textContent =
+        `${q.nickname} · ${when(q.created_at)}${q.updated_at ? ' (수정됨)' : ''}`;
+      node.querySelector('.post-text').textContent = q.body;
+    };
+    fill(p);
+    const form = node.querySelector('.auth');
+    const msg = form.querySelector('.msg');
+    const submit = form.querySelector('button[type="submit"]');
+    let mode = null;
+
+    function open(next) {
+      mode = next;
+      form.hidden = false;
+      form.querySelectorAll('[data-edit]').forEach((el) => {
+        el.hidden = mode !== 'edit';
+        el.querySelector('input, textarea').required = mode === 'edit';
+      });
+      if (mode === 'edit') {
+        form.elements.title.value = p.title;
+        form.elements.body.value = p.body;
+      }
+      submit.textContent = mode === 'edit' ? '수정 저장' : '삭제하기';
+      form.elements.password.value = '';
+      say(msg, '');
+      (mode === 'edit' ? form.elements.title : form.elements.password).focus();
+    }
+    node.querySelector('[data-act="edit"]').onclick = () => open('edit');
+    node.querySelector('[data-act="delete"]').onclick = () => open('delete');
+    form.querySelector('[data-act="cancel"]').onclick = () => { form.hidden = true; };
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      submit.disabled = true;
+      try {
+        if (mode === 'edit') {
+          const title = form.elements.title.value.trim(), body = form.elements.body.value.trim();
+          if (!title || !body) return say(msg, '제목과 내용을 입력하세요.', 'err');
+          const ok = await rpc('update_feedback', { p_id: p.id, p_password: form.elements.password.value, p_title: title, p_body: body });
+          if (!ok) return say(msg, '비밀번호가 맞지 않습니다.', 'err');
+          Object.assign(p, { title, body, updated_at: new Date().toISOString() });
+          fill(p);
+          form.hidden = true;
+        } else {
+          const ok = await rpc('delete_feedback', { p_id: p.id, p_password: form.elements.password.value });
+          if (!ok) return say(msg, '비밀번호가 맞지 않습니다.', 'err');
+          node.remove();
+          total = Math.max(0, total - 1);
+          shown = Math.max(0, shown - 1);
+          updateCount();
+        }
+      } catch (err) {
+        say(msg, err.message, 'err');
+      } finally {
+        submit.disabled = false;
+      }
+    };
+    return node;
+  }
+
+  let shown = 0, total = 0;
+  function updateCount() {
+    $('count').textContent = total ? `${total}개` : '';
+    if (!total) $('posts').innerHTML = '<p class="empty">아직 글이 없습니다. 첫 피드백을 남겨 주세요.</p>';
+    $('more').hidden = shown >= total;
+  }
+
+  async function load(reset) {
+    const msg = $('list-msg');
+    if (reset) { shown = 0; $('posts').textContent = ''; }
+    say(msg, '불러오는 중…');
+    $('more').disabled = true;
+    try {
+      const rows = await rpc('list_feedback', { p_limit: PAGE, p_offset: shown });
+      if (reset && rows.length) $('posts').textContent = '';
+      rows.forEach((p) => $('posts').append(renderPost(p)));
+      shown += rows.length;
+      total = rows.length ? Number(rows[0].total) : (reset ? 0 : total);
+      updateCount();
+      say(msg, '');
+    } catch (err) {
+      say(msg, `글을 불러오지 못했습니다: ${err.message}`, 'err');
+    } finally {
+      $('more').disabled = false;
+    }
+  }
+
+  $('write').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target, msg = $('write-msg'), btn = f.querySelector('button[type="submit"]');
+    const v = (n) => f.elements[n].value.trim();
+    if (!v('nickname') || !v('title') || !v('body')) return say(msg, '닉네임, 제목, 내용을 모두 입력하세요.', 'err');
+    if (f.elements.password.value.length < 4) return say(msg, '비밀번호는 4자 이상으로 정하세요.', 'err');
+    btn.disabled = true;
+    try {
+      await rpc('create_feedback', { p_nickname: v('nickname'), p_title: v('title'), p_body: v('body'), p_password: f.elements.password.value });
+      // 닉네임은 다음 글을 위해 남긴다.
+      f.elements.title.value = ''; f.elements.body.value = ''; f.elements.password.value = '';
+      say(msg, '올렸습니다. 고마워요!', 'ok');
+      await load(true);
+    } catch (err) {
+      say(msg, `올리지 못했습니다: ${err.message}`, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  };
+  $('more').onclick = () => load(false);
+
+  if (!ready) {
+    $('setup').hidden = false;
+    $('write').querySelectorAll('input, textarea, button').forEach((el) => { el.disabled = true; });
+    return;
+  }
+  load(true);
+})();
+</script>
+</body>
+</html>
