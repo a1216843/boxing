@@ -84,6 +84,34 @@ void main() {
     expect(math.max(land[J.leadToe].y, land[J.rearToe].y), lessThan(0.03));
   });
 
+  test('어퍼: 무릎을 굽혀 주먹을 떨어뜨렸다가, 일어서며 아래에서 위로 올려친다', () {
+    for (final m in [Moves.leadUpper, Moves.rearUpper]) {
+      final tl = PoseTimeline([m]);
+      final impact = animSeconds(m) * moveAnim(m).impact;
+      final hand = m.leadHand! ? J.leadHand : J.rearHand;
+      final elbow = m.leadHand! ? J.leadElbow : J.rearElbow;
+      final start = tl.at(0);
+      var low = double.infinity, lowAt = 0.0, sink = 0.0;
+      for (var i = 0; i <= 60; i++) {
+        final s = tl.at(impact * i / 60);
+        if (s[hand].y < low) (low, lowAt) = (s[hand].y, i / 60);
+        sink = math.max(sink, start[J.pelvis].y - s[J.pelvis].y);
+      }
+      // 주먹이 가드보다 15cm 넘게 떨어지고, 골반도 함께 낮아진다.
+      expect(start[hand].y - low, greaterThan(0.15), reason: m.id);
+      expect(sink, greaterThan(0.06), reason: m.id);
+      // 떨어지는 건 앞부분이고, 임팩트에선 가드보다 높이 올라가 있다.
+      expect(lowAt, lessThan(0.6), reason: m.id);
+      final hit = tl.at(impact);
+      expect(hit[hand].y - start[hand].y, greaterThan(0.08), reason: m.id);
+      // 팔꿈치는 주먹 아래 뒤쪽 (앞팔이 앞으로 기울어 서 있다).
+      expect(hit[hand].y - hit[elbow].y, greaterThan(0.12), reason: m.id);
+      // 수직이 아니라 앞·위 대각선으로 올라간다: 가장 낮은 곳에서 임팩트까지 앞으로 간 거리가 오른 높이의 0.7배 넘게 (35° 넘게 기운다).
+      final bottom = tl.at(impact * lowAt);
+      expect((hit[hand].z - bottom[hand].z) / (hit[hand].y - bottom[hand].y), greaterThan(0.7), reason: m.id);
+    }
+  });
+
   test('칠 때는 몸이 먼저, 거둘 때는 팔이 먼저 움직인다', () {
     final anim = moveAnim(Moves.cross);
     final keys = [(0.0, guardPose), ...anim.keys];

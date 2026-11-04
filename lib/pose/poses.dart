@@ -59,8 +59,8 @@ ArmTarget _arm(Arm arm, double side, double yaw) {
     // 옆으로 크게 빼면 궤적이 실제보다 3배 휜다.
     // 팔꿈치는 바깥으로 들고, 주먹은 정면 중심선의 턱 높이에 닿는다.
     Arm.hook => aimed(const V3(0.02, 0.04, 0.5), V3(side, 0.25, 0)),
-    // 어퍼: 주먹을 가슴 높이로 살짝 떨어뜨렸다가 턱 높이로 올려친다.
-    Arm.uppercut => aimed(V3(side * 0.03, 0.14, 0.42), V3(side * 0.3, -1, -0.1)),
+    // 어퍼: 몸 앞 아래에서 앞·위 대각선으로 올라가 상대 턱 밑을 친다. 앞팔은 앞으로 기울어 있다.
+    Arm.uppercut => aimed(V3(side * 0.03, 0.1, 0.56), V3(side * 0.3, -1, -0.45)),
     Arm.bodyHook => aimed(const V3(0.02, -0.12, 0.46), V3(side, -0.2, 0)),
     // 오버핸드: 팔꿈치를 바깥 위로 들고 주먹이 위에서 비스듬히 내려꽂힌다. 팔은 다 펴지 않는다.
     Arm.overhand => aimed(const V3(0.14, 0.26, 0.56), V3(side, 0.4, -0.2)),
@@ -191,6 +191,7 @@ class Pose {
           double? shiftX,
           double? drop,
           double? pitch,
+          double? roll,
           double? leadLift,
           double? rearLift,
           Order? order}) =>
@@ -202,7 +203,7 @@ class Pose {
         shiftX: shiftX ?? this.shiftX,
         shiftZ: shiftZ,
         drop: drop ?? this.drop,
-        roll: roll,
+        roll: roll ?? this.roll,
         pitch: pitch ?? this.pitch,
         leadFootZ: leadFootZ ?? this.leadFootZ,
         rearFootZ: rearFootZ ?? this.rearFootZ,
@@ -222,6 +223,9 @@ class Pose {
 
   /// 무릎을 [drop]만큼 굽힌 자세.
   Pose dropped(double drop) => _with(drop: drop);
+
+  /// 상체를 옆으로 [roll]도 기울인 자세 (음수 = 리드 쪽).
+  Pose rolled(double roll) => _with(roll: roll);
 
   /// 앞발 앞꿈치를 축으로 몸 전체를 [deg]도 돌린 자세 (체크 훅·점프 훅). 양수 = 리드 훅이 도는 쪽 (뒷발이 뒤로 돌아 나감).
   /// 발·골반·몸통 회전이 함께 돌고, 팔은 몸통 좌표라 저절로 따라간다.
@@ -641,12 +645,10 @@ Skeleton peakSkeleton(Move m) => strikePose(m).build();
 /// (위빙으로 옆으로 각도를 잡는 발놀림이 화면에서 보이도록).
 V3 focusOf(Skeleton s) => V3(0.05, 0, (s[J.leadToe].z + s[J.rearToe].z) / 2);
 
-/// 어퍼·오버핸드가 가는 도중 주먹이 지나가는 쪽 (치는 손 기준 몸통 좌표 오프셋).
+/// 오버핸드가 가는 도중 주먹이 지나가는 쪽 (치는 손 기준 몸통 좌표 오프셋). 바깥 위로 돌아 휜다.
 /// 치기 전에 뒤로 감는 준비 동작은 실제 선수에게 거의 없다. 손목이 20% 움직이는 시점이 실제 27~58ms인데
-/// 준비 동작을 넣으면 70~97ms로 늦어진다. 대신 가는 도중 어퍼는 앞으로 나가며 올라가, 오버핸드는 바깥 위로 돌아 휜다.
-/// 훅은 [_hookVia]로 따로 그린다.
+/// 준비 동작을 넣으면 70~97ms로 늦어진다. 훅은 [_hookVia], 어퍼는 [_upperVia]로 따로 그린다.
 V3? _arc(Move m) => switch (m.id) {
-      'leadUpper' || 'rearUpper' => const V3(0, -0.02, 0.1),
       'overhand' => const V3(0.08, 0.1, -0.04),
       _ => null,
     };
@@ -675,6 +677,37 @@ Pose Function(double s) _hookVia(Move m, Pose peak) {
     // 팔꿈치는 주먹보다 먼저 올라간다 (가는 길의 앞쪽 40%에서 거의 다 든다).
     final pole = V3.lerp(poleFrom, poleTo, math.min(1.0, s * 2.2));
     return Pose.lerp(guardPose, peak, s).aimedArm(lead, hand, pole, s);
+  };
+}
+
+/// 어퍼가 떨어지는 깊이 (가드 대비 주먹·골반).
+const _upperDip = 0.15, _upperSink = 0.07;
+
+/// 어퍼 도중 자세. [s] = 0(가드) ~ 1(임팩트).
+///
+/// 치는 쪽 어깨를 낮추며 무릎을 굽혀 주먹을 명치 높이로 떨어뜨렸다가, 다리로 바닥을 밀고 일어서며
+/// 주먹을 몸 앞 아래에서 앞·위 대각선으로 올려 상대 턱 밑을 친다. 팔꿈치는 주먹 아래 뒤쪽에 둔다.
+/// 주먹을 가드 자리에서 바로 올리면 펀치가 아니라 손을 들어 얼굴을 가리는 것처럼 보인다.
+Pose Function(double s) _upperVia(Move m, Pose peak) {
+  final lead = m.leadHand!;
+  final side = lead ? -1.0 : 1.0;
+  ArmTarget arm(Pose p) => lead ? p.lead : p.rear;
+  final from = arm(guardPose).hand.rotY(guardPose.yaw), to = arm(peak).hand.rotY(peak.yaw);
+  final poleTo = arm(peak).pole.rotY(peak.yaw);
+  return (s) {
+    // 앞 40%에서 떨어지고 그 뒤 위로 올라간다: 높이는 가드 → 바닥(명치) → 목표.
+    final sink = s < 0.4 ? math.sin(math.pi / 2 * s / 0.4) : math.cos(math.pi / 2 * (s - 0.4) / 0.6);
+    final base = Pose.lerp(guardPose, peak, s);
+    // 떨어지는 동안은 주먹을 몸 쪽으로 조금 당기고, 바닥(명치 앞)에서 목표까지 앞·위로 함께 올라간다 (대각선).
+    final fwd = s < 0.4 ? -0.1 * s / 0.4 : -0.1 + 1.1 * (s - 0.4) / 0.6;
+    final hand = V3(from.x + (to.x - from.x) * s, from.y + (to.y - from.y) * s * s - _upperDip * sink,
+        from.z + (to.z - from.z) * fwd);
+    // 팔꿈치는 처음부터 주먹 아래로 내린다.
+    final pole = V3.lerp(V3(side * 0.3, -1, 0.1), poleTo, s);
+    return base
+        .dropped(base.drop + _upperSink * sink)
+        .rolled(base.roll + side * 10 * sink)
+        .aimedArm(lead, hand, pole, s);
   };
 }
 
@@ -794,6 +827,16 @@ MoveAnim moveAnim(Move m) {
       return MoveAnim([
         (impact * 0.35, via(0.35).ordered(Order.bodyFirst)),
         (impact * 0.7, via(0.7).ordered(Order.bodyFirst)),
+        (impact, strike),
+        (impact + 0.06, strike),
+        (1.0, rest),
+      ], impact, advance);
+    }
+    if (m.type == MoveType.uppercut) {
+      final via = _upperVia(m, peak);
+      return MoveAnim([
+        (impact * 0.4, via(0.4).ordered(Order.bodyFirst)),
+        (impact * 0.75, via(0.75).ordered(Order.bodyFirst)),
         (impact, strike),
         (impact + 0.06, strike),
         (1.0, rest),
